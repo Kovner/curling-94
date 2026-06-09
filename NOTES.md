@@ -9,8 +9,9 @@ the lab moves to the next backlog item. Every ~3 iterations: one holistic
 full-game playtest. This file is the durable memory between sessions —
 log every verdict and locked-in value here.
 
-Play URL: pinned githack per commit (Pages pending — needs Settings →
-Pages → Source: GitHub Actions, then re-run the deploy workflow).
+Play URL: https://kovner.github.io/curling-94/ — auto-redeploys on every
+push to the branch (Pages enabled 2026-06-09). Hard-refresh if a new
+build doesn't show.
 
 ## Backlog (impact-on-fun order)
 
