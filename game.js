@@ -85,13 +85,13 @@ function jingle(win) {
   seq.forEach((f, i) => setTimeout(() => beep(f, 0.16, 'square', 0.09), i * 130));
 }
 // tiny title-screen sequencer
-const TUNE = [262, 330, 392, 330, 294, 370, 440, 370, 262, 330, 392, 523, 440, 392, 330, 294];
+const MELODY = [262, 330, 392, 330, 294, 370, 440, 370, 262, 330, 392, 523, 440, 392, 330, 294];
 let tuneT = 0, tuneI = 0;
 function tickTune(dt) {
   tuneT -= dt;
   if (tuneT <= 0 && AC) {
-    beep(TUNE[tuneI % TUNE.length], 0.12, 'square', 0.04);
-    beep(TUNE[tuneI % TUNE.length] / 2, 0.22, 'triangle', 0.05);
+    beep(MELODY[tuneI % MELODY.length], 0.12, 'square', 0.04);
+    beep(MELODY[tuneI % MELODY.length] / 2, 0.22, 'triangle', 0.05);
     tuneI++; tuneT = 0.22;
   }
 }
@@ -274,14 +274,27 @@ const WLEN = 41.6;                 // playable world length
 const HOUSE_R = 1.83;              // 12-foot ring
 const R = 0.25;                    // stone radius (chunky arcade granite)
 const A0 = 0.092;                  // base ice deceleration m/s^2
-const SWEEP_FRICTION = 0.72;       // friction multiplier at full sweep
-const SWEEP_CURL = 0.3;            // curl multiplier at full sweep
-const CURL_K = 0.0068;             // curl strength (~1m of bend on a draw)
-const TS = 2.4;                    // arcade time scale (real curling is slooow)
 const SX = 28, SY = 22;            // pixels per meter (NHL-style wide look)
 const SHEET_PX = SHEET_HALF * 2 * SX;
 const VMIN = 1.2, VMAX = 4.1;      // power meter velocity range
 const VIEW_M = H / SY;
+
+// ---- FEEL LAB (EXP-01): live-switchable tuning profiles, keys 1-4.
+// ts: time scale | aimSpeed/aimRange: arrow oscillation | powerPeriod: meter cycle
+// curlK: bend strength | sweepAdd/Decay: mash response | sweepFriction/Curl: sweep effect
+const PROFILES = [
+  { name:'CLASSIC', ts:2.4, aimSpeed:2.4, aimRange:4.2, powerPeriod:1.3,
+    curlK:0.0068, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
+  { name:'ARCADE',  ts:3.4, aimSpeed:3.2, aimRange:4.6, powerPeriod:0.95,
+    curlK:0.0055, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
+  { name:'SIM',     ts:1.7, aimSpeed:1.6, aimRange:3.6, powerPeriod:1.8,
+    curlK:0.0095, sweepAdd:0.25, sweepDecay:0.9, sweepFriction:0.82, sweepCurl:0.40 },
+  { name:'TWITCHY', ts:2.4, aimSpeed:4.6, aimRange:4.2, powerPeriod:0.75,
+    curlK:0.0068, sweepAdd:0.28, sweepDecay:1.8, sweepFriction:0.70, sweepCurl:0.30 },
+];
+let tuneIdx = 0;
+try { tuneIdx = Math.min(3, Math.max(0, +localStorage.getItem('c94feel') || 0)); } catch (e) {}
+let TUNE = PROFILES[tuneIdx];
 
 function curlG(v) { return Math.max(0.12, Math.min(1.55, 1.7 - 0.6 * v)); }
 function vOfPower(p) { return VMIN + p * (VMAX - VMIN); }
@@ -319,19 +332,19 @@ function moving(s) { return Math.hypot(s.vy, s.vz) > 0.04; }
 function anyMoving() { return G.stones.some(s => s.alive && moving(s)); }
 
 function stepPhysics(rdt) {
-  const SUB = 4, dt = (rdt * TS) / SUB;
+  const SUB = 4, dt = (rdt * TUNE.ts) / SUB;
   for (let k = 0; k < SUB; k++) {
     for (const s of G.stones) {
       if (!s.alive) continue;
       const sp = Math.hypot(s.vy, s.vz);
       if (sp < 0.04) { s.vy = 0; s.vz = 0; continue; }
       const sweep = (s === G.active) ? G.sweep : 0;
-      const a = A0 * (1 - (1 - SWEEP_FRICTION) * sweep);
+      const a = A0 * (1 - (1 - TUNE.sweepFriction) * sweep);
       const uy = s.vy / sp, uz = s.vz / sp;
       // friction opposing motion
       s.vy -= a * uy * dt; s.vz -= a * uz * dt;
       // curl: lateral accel perpendicular to velocity, grows as stone slows
-      const cl = CURL_K * s.spin * curlG(sp) * (1 - (1 - SWEEP_CURL) * sweep);
+      const cl = TUNE.curlK * s.spin * curlG(sp) * (1 - (1 - TUNE.sweepCurl) * sweep);
       s.vy += -uz * cl * dt; s.vz += uy * cl * dt;
       s.y += s.vy * dt; s.z += s.vz * dt;
       s.rot += s.spin * Math.max(0.6, sp) * 1.6 * dt;
@@ -382,7 +395,7 @@ function simShot(v, ang, spin, stopAtY) {
     if (sp < 0.04) break;
     const uy = vy / sp, uz = vz / sp;
     vy -= A0 * uy * dt; vz -= A0 * uz * dt;
-    const cl = CURL_K * spin * curlG(sp);
+    const cl = TUNE.curlK * spin * curlG(sp);
     vy += -uz * cl * dt; vz += uy * cl * dt;
     y += vy * dt; z += vz * dt;
     if (i % 8 === 0) pts.push({ y, z });
@@ -489,6 +502,15 @@ function cpuSweepLogic() {
 // ---------------------------------------------------------- update
 function update(dt) {
   G.t += dt; G.st += dt;
+  // FEEL LAB: hot-swap tuning profile any time
+  for (let i = 0; i < PROFILES.length; i++) {
+    if (tap('Digit' + (i + 1))) {
+      tuneIdx = i; TUNE = PROFILES[i];
+      try { localStorage.setItem('c94feel', i); } catch (e) {}
+      setFlash('FEEL ' + (i + 1) + ': ' + TUNE.name, '#f8d878', 1.0);
+      sfxMove();
+    }
+  }
   if (G.flash) { G.flash.t -= dt; if (G.flash.t <= 0) G.flash = null; }
   // camera easing
   G.cam += (G.camTarget - G.cam) * Math.min(1, dt * 5);
@@ -527,7 +549,7 @@ function update(dt) {
         G.aimAng += (G.cpu.ang - G.aimAng) * Math.min(1, dt * 4);
         if (G.st > 1.1) { G.aimAng = G.cpu.ang; sfxLock(); setState('curl'); }
       } else {
-        G.aimAng = Math.sin(G.st * 2.4) * (4.2 * Math.PI / 180);
+        G.aimAng = Math.sin(G.st * TUNE.aimSpeed) * (TUNE.aimRange * Math.PI / 180);
         if (tap('Space') || tap('Enter')) { sfxLock(); setState('curl'); }
       }
       break;
@@ -548,7 +570,7 @@ function update(dt) {
         G.power = Math.min(G.cpu.p, G.st / 1.1);
         if (G.power >= G.cpu.p) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
       } else {
-        const ph = (G.st / 1.3) % 1;
+        const ph = (G.st / TUNE.powerPeriod) % 1;
         G.power = ph < 0.5 ? ph * 2 : 2 - ph * 2;
         if (tap('Space') || tap('Enter')) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
       }
@@ -575,9 +597,9 @@ function update(dt) {
       if (G.cpuTurn) cpuSweepLogic();
       else {
         if (tap('Space') || tap('KeyZ') || tap('KeyX') || tap('ArrowLeft') || tap('ArrowRight')) {
-          G.sweep = Math.min(1, G.sweep + 0.34); sfxSweep();
+          G.sweep = Math.min(1, G.sweep + TUNE.sweepAdd); sfxSweep();
         }
-        G.sweep = Math.max(0, G.sweep - dt * 1.1);
+        G.sweep = Math.max(0, G.sweep - dt * TUNE.sweepDecay);
       }
       stepPhysics(dt);
       const s = G.active;
@@ -907,6 +929,7 @@ function drawTitle() {
   px(W / 2 - 2, 166, 4, 5, '#881400');
   drawTextSh('HURRY HARD EDITION', W / 2, 206, '#f8d878', '#000000', 1, 'center');
   drawText('(C) 1994 GRANITE GAMES', W / 2, 224, '#9cc4dc', 1, 'center');
+  drawText('FEEL LAB: KEYS 1-4', W / 2, 214, '#3cbcfc', 1, 'center');
 }
 function drawMenu() {
   stripes('#881400', '#d82800', 25);
@@ -969,7 +992,13 @@ function drawGame() {
   }
   if (G.state === 'power' && !G.cpuTurn)
     drawText('SPACE: SET WEIGHT', W / 2, 228, '#fcfcfc', 1, 'center');
+  drawFeelChip();
   drawFlash();
+}
+function drawFeelChip() {
+  const label = (tuneIdx + 1) + '.' + TUNE.name;
+  px(0, 226, textW(label, 1) + 6, 12, '#00287c');
+  drawText(label, 3, 229, '#f8d878');
 }
 function drawEndScore() {
   stripes('#00287c', '#0058f8', 20);
@@ -1023,4 +1052,4 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
-if (typeof window !== 'undefined') window.__C94 = G; // debug/testing hook
+if (typeof window !== 'undefined') { window.__C94 = G; window.__C94tune = () => TUNE; } // debug/testing hooks

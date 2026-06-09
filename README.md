@@ -42,6 +42,11 @@ Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or
 2-player hot seat, stones per team per end (2/4/8), and number of ends.
 
+**Feel lab:** keys `1`–`4` hot-swap game-feel tuning profiles (speed,
+meter difficulty, curl, sweeping) any time, even mid-throw. The active
+profile shows bottom-left and is remembered. See `NOTES.md` for the
+ongoing experiments.
+
 The minimap on the right shows the whole sheet, every stone, and (while
 aiming) your projected path — watch it bend as the meter moves and time
 your release like a draw-weight pro.
