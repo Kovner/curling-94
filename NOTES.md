@@ -15,12 +15,77 @@ build doesn't show.
 
 ## Backlog (impact-on-fun order)
 
-1. **Core throw feel** — timescale, aim/power meter speed & difficulty ← EXP-01 (active)
-2. **Sweeping** — input scheme (mash vs rhythm vs hold), rescue power
-3. **Collision/takeout drama** — impact feedback, shake, sound, slow-mo?
-4. **CPU personality & difficulty** — strategy variety, fairness, taunts
-5. **Presentation** — title, splashes, story beats between ends
-6. Holistic pass — pacing of a full end, scoring clarity
+1. **Core throw feel** — EXP-01 ✅ (CLASSIC) → EXP-02 flow rework (verdict pending)
+2. **Real curling timing & weight-by-eye** (Mike, 2026-06-09) — see
+   research below. Proposed BEFORE sweeping because sweep pacing depends
+   entirely on how long the ride is.
+3. **Sweeping** — input scheme (mash vs rhythm vs hold), rescue power —
+   re-tuned on top of real timing.
+4. **Living ice conditions** (Mike, 2026-06-09) — the big one; see
+   research below. Goal: simulate the *nature of playing a curling
+   game* — reading and adapting to ice — not just executing shots.
+5. **Collision/takeout drama** — impact feedback, shake, sound, slow-mo?
+6. **CPU personality & difficulty** — strategy variety, fairness, taunts;
+   must also *read the ice* once item 4 lands.
+7. **Presentation** — title, splashes, story beats between ends
+8. Holistic pass — pacing of a full end, scoring clarity
+
+## Research: real curling timing (for backlog item 2)
+
+Customer requirement: weight is judged by eye and by interval timing;
+even a "sped up" game should keep hog-to-hog draw time ≈ **13.5–15s**.
+
+Findings (curltech.com/timing-rocks, lanarkcurlingclub.org timing PDF):
+- **Hog-to-hog (HTH)** for a draw stopping on the tee: ~13.0–14.5s on
+  normal ice; championship ice 14.7–15.0s; ±0.5s is normal game drift.
+  Skips track HTH constantly to read ice speed ("are we still 14.5?").
+- **Split time** (back line → near hog) is the thrower-side readout:
+  draws ~3.75–4.00s; hack weight ~3.40s; normal hit ~3.00s; peel ~2.75s.
+  Rule of thumb: 0.1s of split ≈ 6 feet of carry.
+- Our physics already produces ~13.1s HTH in sim units (a≈0.092 was
+  calibrated to real ice), so this is mostly **setting TS ≈ 1.0 during
+  the slide** + tuning, not new physics.
+
+Design sketch: near-real-time ride; NES-style stopwatch HUD that shows
+the split at the near hog and live HTH; weight zones on the meter could
+eventually be REPLACED by learning your splits (the meter becomes
+delivery effort, the stopwatch becomes truth). Pacing risk: full ride ≈
+20s+ of watching per throw × 16 throws/end — mitigate with snappy
+pre-throw, fast CPU decisions, and maybe a hold-to-fast-forward once the
+stone is past saving (only when no sweeping input for N seconds).
+
+## Research: living ice conditions (for backlog item 4)
+
+Customer requirement: mostly consistent but not perfect across the
+sheet; changes throughout the game; every game has slightly different
+base conditions.
+
+Findings (curltech.com/ice-and-rocks, curlingbasics.com, olympics.com,
+smithsonianmag.com):
+- **Pebble** (frozen water droplets sprayed pre-game) is what stones
+  ride on. Its state drives everything: fresh pebble starts slightly
+  slow/straight, **keens up** over the first ends as droplet heads round
+  off (HTH drifting ~13.0→14.2s), then **breaks down** late — slower,
+  straighter, "flat spots."
+- **Spatial variation**: center of the sheet is most level and most
+  used — the heavy-traffic center path polishes faster/straighter over
+  a game; outside edges are riskier (frost film, and on bad ice
+  "negative ice"/falls where stones fall against the turn). Sides of a
+  sheet can swing differently.
+- **Magnitudes**: speed ±0.5s HTH within a game is normal; curl is
+  ~4 ft (club) to 5–6 ft (championship) and changes as pebble wears.
+  Warm surface (23–24°F) = faster + swingier; cold/frosty (21–22°F) =
+  slower + straighter. Humid air = lubricated, straighter ice.
+- Teams designate someone to watch tracks and patterns — *reading the
+  ice is a core skill the sim should reward*.
+
+Design sketch: per-game seed → base HTH (13.5–15.0s) + base curl
+(3.5–6 ft) + a smooth low-frequency noise field over the sheet (keen and
+heavy zones, one swingy side); slow drift over ends along the
+keen-up-then-break-down arc; a wear/polish field that builds along
+actual stone tracks during play. Pre-game "ICE REPORT" card (very 90s
+TV) gives a hint, but the truth is learned by throwing and timing.
+CPU must read ice too or it'll feel psychic/unfair.
 
 ## Experiment log
 
