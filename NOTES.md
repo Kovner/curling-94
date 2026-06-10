@@ -42,12 +42,41 @@ Current profile shows bottom-left; choice persists in localStorage.
 
 **Ask:** which profile, and what single thing is still off in it?
 
+**Verdict (2026-06-09):** **CLASSIC (1) wins.** "Closest to the feel we
+should be going for. It's a bit hard to hit the broom and to hit the
+weight and you have to judge that" — difficulty is on the hard edge but
+the judgment is part of the game; don't soften it, make it more
+*judgeable* instead. Two flow changes requested → EXP-02.
+
+### EXP-02: Throw flow rework (ACTIVE)
+
+Direct customer feedback, both about honesty and fluidity of the motion:
+
+1. **Handle before aim.** Old order let you pick curl after seeing your
+   locked aim — adjusting the turn to rescue a bad lock. New order:
+   prethrow → CHOOSE HANDLE → aim → weight. Commit to the turn first,
+   like a real skip's call.
+2. **One-motion delivery.** Pressing Space locks the aim AND immediately
+   starts the weight bar rising; releasing Space releases the stone at
+   that weight. No more separate oscillating power phase for humans.
+   (CPU animates the same ramp.)
+3. Added: audio ticks as the rising bar crosses GRD/DRW/HIT marks, so
+   weight can be judged by ear mid-hold (helps the "hard to judge
+   weight" note without making it easier mechanically).
+
 **Verdict:** _pending_
 
 ## Locked-in values
 
-- (none yet — CLASSIC is the provisional default)
+- Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for
+  future reference.
+- Throw flow: handle → aim → hold-release weight (EXP-02, pending
+  verdict).
 
 ## Raw feedback archive
 
 - 2026-06-09: "ok it works great" — v1 baseline approved, no specific complaints.
+- 2026-06-09 (EXP-01): "1 is the closest to the feel... a bit hard to
+  hit the broom and to hit the weight and you have to judge that." Plus:
+  choose turn before aiming; weight should be hold-release continuation
+  of the aim press.

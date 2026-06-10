@@ -34,9 +34,9 @@ Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
 
 | Phase  | What happens | Controls |
 |--------|--------------|----------|
-| AIM    | The arrow oscillates left/right | `SPACE` to lock it |
-| HANDLE | Pick the curl direction (in-turn / out-turn) | `←` / `→`, then `SPACE` |
-| WEIGHT | The power meter oscillates — guard / draw / takeout zones marked | `SPACE` to lock |
+| HANDLE | Commit to the curl direction first (in-turn / out-turn) | `←` / `→`, then `SPACE` |
+| AIM    | The arrow oscillates left/right | press **and hold** `SPACE` to lock |
+| WEIGHT | The bar rises while you hold — guard / draw / takeout marks tick as you pass them | **release** `SPACE` to throw |
 | SWEEP  | Stone is away! Sweeping carries it farther and straighter | mash `SPACE` (or `Z`/`X`) |
 
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or

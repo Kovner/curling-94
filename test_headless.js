@@ -49,12 +49,12 @@ check('aim solver lands within 0.3m of target', Math.abs(solved.z) < 0.3, 'z=' +
 
 // ---- full game vs CPU
 check('boots to title', G.state === 'title');
-press('Enter'); step(2);
+press('Enter'); release('Enter'); step(2);
 check('title -> menu', G.state === 'menu');
 // shrink the match: stones=2 per end (menu row 1: 4 -> 2 needs Left once)
 press('ArrowDown'); step(1); press('ArrowLeft'); step(1);
 check('stones option set to 2', G.rocksPer === 2);
-press('Enter'); step(2);
+press('Enter'); release('Enter'); step(2);
 check('menu -> prethrow', G.state === 'prethrow');
 
 let frames = 0, throwsSeen = 0, lastState = '';
@@ -62,12 +62,17 @@ const MAXF = 60 * 60 * 30; // 30 sim-minutes cap
 while (G.state !== 'gameover' && frames < MAXF) {
   if (G.state !== lastState) { if (G.state === 'slide') throwsSeen++; lastState = G.state; }
   const human = !(G.mode === 1 && G.team === 1);
-  if (['prethrow', 'aim', 'curl', 'power', 'endscore'].includes(G.state)) {
-    if (human || G.state === 'endscore' || G.state === 'prethrow') {
-      if (frames % 20 === 0) press('Space');
+  const s = G.state;
+  if (['prethrow', 'curl', 'endscore'].includes(s)) {
+    if (human || s === 'endscore' || s === 'prethrow') {
+      if (frames % 20 === 0) { press('Space'); release('Space'); }
     }
-  } else if (G.state === 'slide' && human && frames % 8 === 0) {
-    press('Space');
+  } else if (s === 'aim' && human) {
+    if (frames % 20 === 0) press('Space'); // press AND HOLD locks aim
+  } else if (s === 'power' && human) {
+    if (G.st > 0.65) release('Space');     // let go around draw weight
+  } else if (s === 'slide' && human && frames % 8 === 0) {
+    press('Space'); release('Space');
   }
   step(1); frames++;
 }
@@ -80,7 +85,7 @@ check('a winner was declared', G.gameWinner === 0 || G.gameWinner === 1);
 check('renderer drew pixels', calls.fillRect > 1000);
 
 step(70); // splash ignores input for the first second
-press('Enter'); step(2);
+press('Enter'); release('Enter'); step(2);
 check('gameover -> title', G.state === 'title');
 
 console.log(failed ? `\n${failed} FAILURE(S)` : '\nALL TESTS PASSED');
