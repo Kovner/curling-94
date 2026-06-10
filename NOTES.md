@@ -46,13 +46,18 @@ Findings (curltech.com/timing-rocks, lanarkcurlingclub.org timing PDF):
   calibrated to real ice), so this is mostly **setting TS ≈ 1.0 during
   the slide** + tuning, not new physics.
 
-Design sketch: near-real-time ride; NES-style stopwatch HUD that shows
-the split at the near hog and live HTH; weight zones on the meter could
+Design sketch (CLARIFIED by Mike 2026-06-09): timing maps to real
+curling but playback stays sped up — the stopwatch displays
+**simulation seconds** (canonical curling time), not wall-clock. At 2x
+playback a 3.6 split shows as 3.6 even though you watched 1.8s. Our
+physics already runs in real units internally, so this is just a HUD
+counting sim-time: split flashed at the near hog, live HTH, final HTH
+on stop. NES-style stopwatch graphic. Weight zones on the meter could
 eventually be REPLACED by learning your splits (the meter becomes
-delivery effort, the stopwatch becomes truth). Pacing risk: full ride ≈
-20s+ of watching per throw × 16 throws/end — mitigate with snappy
-pre-throw, fast CPU decisions, and maybe a hold-to-fast-forward once the
-stone is past saving (only when no sweeping input for N seconds).
+delivery effort, the stopwatch becomes truth). Experiment also tests
+2-3 playback speeds with the watch running to find where motion is
+still eye-readable. (Earlier pacing concern about near-real-time rides
+is void — playback speed stays arcade.)
 
 ## Research: living ice conditions (for backlog item 4)
 
