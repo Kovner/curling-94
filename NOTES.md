@@ -197,6 +197,16 @@ also the real delivery). Verified against the curltech tables on our
 the residual mostly ice-speed reference differences. Camera now tracks
 the glide.
 
+**Addendum 2 ("CCW went right", Mike):** re-verified in-game physics
+empirically: CW bends only right, CCW only left, peels exactly 0.000m
+both ways. Root cause was readability: the locked aim angle left no
+trace on screen, so a dead-straight stone on a slightly-right line
+reads as wrong-way curl. Fix: the delivery line stays faintly dotted
+on the ice during the throw with a skip's broom marker at its tee-line
+crossing — curl now reads as deviation from the line, like real ice.
+Also relabeled the handle picker from IN/OUT (handedness-ambiguous) to
+CCW/CW + explicit 'CURLS LEFT/RIGHT'.
+
 **Verdict:** _pending (test with EXP-03 stopwatch)_
 
 ## Locked-in values

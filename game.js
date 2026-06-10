@@ -822,6 +822,30 @@ function drawSweepers() {
   if (fr) { px(x - 6, y - 9, 12, 1, '#fcfcfc'); px(x - 4, y - 12, 8, 1, '#fcfcfc'); }
 }
 
+function drawAimLine() {
+  // the locked line of delivery: a straight reference so curl reads as
+  // deviation from it (and a straight diagonal reads as aim, not curl)
+  ctx.fillStyle = '#90b8cc';
+  for (let d = 1; d < 42; d += 0.8) {
+    const yy = SLIDE_START + Math.cos(G.aimAng) * d;
+    const zz = Math.sin(G.aimAng) * d;
+    if (Math.abs(zz) > SHEET_HALF || yy > BACK) break;
+    const sy = syOf(yy);
+    if (sy < -4 || sy > H + 4) continue;
+    ctx.fillRect(sxOf(zz), sy, 1, 2);
+  }
+  // skip's broom where the line crosses the tee
+  const bz = Math.sin(G.aimAng) * (TEE - SLIDE_START);
+  if (Math.abs(bz) < SHEET_HALF) {
+    const bx = sxOf(bz), by = syOf(TEE);
+    if (by > -10 && by < H + 10) {
+      px(bx, by - 8, 1, 7, '#c89858');     // handle
+      px(bx - 2, by - 1, 5, 3, '#d82800'); // head
+      px(bx - 2, by + 2, 5, 1, '#f8d878'); // bristles
+    }
+  }
+}
+
 function drawHud() {
   px(0, 0, W, 21, '#00287c');
   px(0, 21, W, 1, '#fcfcfc');
@@ -1006,6 +1030,7 @@ function drawPrethrow() {
 function drawStones() { for (const s of G.stones) if (s.alive) drawStone(s); }
 function drawGame() {
   drawRink();
+  if (['deliver', 'slide'].includes(G.state)) drawAimLine();
   drawStones();
   if (['aim', 'curl', 'power'].includes(G.state)) {
     drawThrower(0, 0);
@@ -1029,13 +1054,13 @@ function drawGame() {
   if (G.state === 'aim' && !G.cpuTurn)
     drawText('SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
   if (G.state === 'curl') {
-    px(W / 2 - 58, 152, 116, 30, '#00287c');
-    px(W / 2 - 58, 152, 116, 1, '#fcfcfc'); px(W / 2 - 58, 181, 116, 1, '#fcfcfc');
-    drawText('CHOOSE HANDLE', W / 2, 156, '#f8d878', 1, 'center');
-    drawText('< IN', W / 2 - 50, 168, G.spin === -1 ? '#f8d878' : '#9cc4dc');
-    drawText('OUT >', W / 2 + 50, 168, G.spin === 1 ? '#f8d878' : '#9cc4dc', 1, 'right');
-    const ar = G.spin === 1 ? '>>' : '<<';
-    drawText(ar, W / 2, 168, '#fcfcfc', 1, 'center');
+    px(W / 2 - 58, 148, 116, 40, '#00287c');
+    px(W / 2 - 58, 148, 116, 1, '#fcfcfc'); px(W / 2 - 58, 187, 116, 1, '#fcfcfc');
+    drawText('CHOOSE HANDLE', W / 2, 152, '#f8d878', 1, 'center');
+    drawText('< CCW', W / 2 - 52, 163, G.spin === -1 ? '#f8d878' : '#9cc4dc');
+    drawText('CW >', W / 2 + 52, 163, G.spin === 1 ? '#f8d878' : '#9cc4dc', 1, 'right');
+    drawText(G.spin === 1 ? '>>' : '<<', W / 2, 163, '#fcfcfc', 1, 'center');
+    drawText(G.spin === 1 ? 'CURLS RIGHT' : 'CURLS LEFT', W / 2, 175, '#fcfcfc', 1, 'center');
   }
   if (G.state === 'power' && !G.cpuTurn && Math.floor(G.t * 6) % 2)
     drawText('SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
