@@ -187,6 +187,16 @@ actual speed and releases at the tee. Stopwatch now starts at the BACK
 LINE crossing like a real timer, so SPL is a true back-to-hog split
 (draws ~3.3s here vs 3.75-4.0 real — close, our release speed differs).
 
+**Addendum (split accuracy, Mike's question):** with release at the
+near tee, splits read 0.2-0.4s fast vs real tables — real timers see
+the stone carried at ~release speed through most of the back-to-hog
+zone. Fix: release point moved to y=9.0, just before the hog (which is
+also the real delivery). Verified against the curltech tables on our
+13.0-HTH ice: draw 3.52 (real ~3.6), hack 3.12 (~3.4), normal hit 2.77
+(~3.0), peel 2.37 (~2.5-2.75) — within ~0.1-0.3s across the range, with
+the residual mostly ice-speed reference differences. Camera now tracks
+the glide.
+
 **Verdict:** _pending (test with EXP-03 stopwatch)_
 
 ## Locked-in values

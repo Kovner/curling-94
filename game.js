@@ -268,7 +268,7 @@ const WALL_Z = SHEET_HALF - 0.05;  // side boards
 const SLIDE_START = 0.8;           // stone sits here pre-throw, slide begins
 const NBACK = 1.83;                // near back line (hack to back line, real geometry)
 const NTEE = 3.66;                 // near tee line
-const RELEASE_Y = 3.6;             // release point at the near tee
+const RELEASE_Y = 9.0;             // release just before the hog, like a real slide
 const NHOG = 10.0;                 // near hog line
 const FHOG = 31.95;                // far hog line
 const TEE = 38.35;                 // far tee (button)
@@ -590,10 +590,10 @@ function update(dt) {
       break;
     }
     case 'deliver': {
-      G.camTarget = -2;
-      // slide out of the hack at the throw's real speed
+      // slide out of the hack at the throw's real speed, camera tracking
       const prevDy = G.deliverY;
       G.deliverY += G.vRelease * dt * TUNE.ts;
+      G.camTarget = Math.max(-2, Math.min(G.deliverY - 3.5, WLEN - VIEW_M + 0.4));
       if (prevDy < NBACK && G.deliverY >= NBACK) {
         G.watch.started = true; // stopwatch starts at the back line, like a real timer
         beep(1760, 0.04, 'square', 0.05);
