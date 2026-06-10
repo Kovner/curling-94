@@ -449,6 +449,7 @@ function nextThrow() {
   G.cpuTurn = (G.mode === 1 && G.team === 1);
   G.aimAng = 0; G.spin = 1; G.power = 0; G.sweep = 0;
   G.events = { contact: false, takeouts: 0, hogged: false, out: false };
+  G.watch = { run: 0, split: null, hogT: null, hth: null }; // sim-time stopwatch
   G.cpu = G.cpuTurn ? planCpu() : null;
   const T = TEAMS[G.team];
   G.taunt = T.taunts[(Math.random() * T.taunts.length) | 0];
@@ -602,7 +603,19 @@ function update(dt) {
         }
         G.sweep = Math.max(0, G.sweep - dt * TUNE.sweepDecay);
       }
+      // stopwatch runs in SIM seconds (real curling time) regardless of playback speed
+      const w = G.watch, act = G.active;
+      const prevY = act && act.alive ? act.y : null;
+      if (act && act.alive && moving(act)) w.run += dt * TUNE.ts;
       stepPhysics(dt);
+      if (act && act.alive && prevY !== null) {
+        if (prevY < NHOG && act.y >= NHOG && w.split === null) {
+          w.split = w.run; w.hogT = w.run; beep(1760, 0.05, 'square', 0.07);
+        }
+        if (prevY < FHOG && act.y >= FHOG && w.hogT !== null && w.hth === null) {
+          w.hth = w.run - w.hogT; beep(1760, 0.05, 'square', 0.07);
+        }
+      }
       const s = G.active;
       if (s && s.alive) {
         G.camTarget = Math.max(-2, Math.min(s.y - 3.5, WLEN - VIEW_M + 0.4));
@@ -979,6 +992,7 @@ function drawGame() {
   drawMinimap(['aim', 'curl', 'power'].includes(G.state));
   if (G.state === 'power') drawPowerMeter();
   drawSweepGauge();
+  drawStopwatch();
   if (G.state === 'aim' && !G.cpuTurn)
     drawText('SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
   if (G.state === 'curl') {
@@ -994,6 +1008,21 @@ function drawGame() {
     drawText('SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
   drawFeelChip();
   drawFlash();
+}
+function drawStopwatch() {
+  if (!G.watch || !['slide', 'postthrow'].includes(G.state)) return;
+  const w = G.watch;
+  if (w.split === null && w.run === 0) return;
+  const x = 4, y = 26;
+  px(x, y, 58, 30, '#00287c');
+  px(x, y, 58, 1, '#fcfcfc'); px(x, y + 29, 58, 1, '#fcfcfc');
+  const fmt = t => t === null ? '--.-' : t.toFixed(1);
+  drawText('SPL ' + fmt(w.split), x + 3, y + 4, w.split === null ? '#9cc4dc' : '#f8d878');
+  // live hog-to-hog while the stone is between the lines, frozen once across
+  let hh = w.hth;
+  if (hh === null && w.hogT !== null && G.state === 'slide') hh = w.run - w.hogT;
+  drawText('H-H ' + fmt(hh), x + 3, y + 13, w.hth === null ? '#9cc4dc' : '#f8d878');
+  drawText('SEC', x + 3, y + 22, '#3cbcfc');
 }
 function drawFeelChip() {
   const label = (tuneIdx + 1) + '.' + TUNE.name;

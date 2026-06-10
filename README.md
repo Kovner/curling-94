@@ -51,6 +51,12 @@ The minimap on the right shows the whole sheet, every stone, and (while
 aiming) your projected path — watch it bend as the meter moves and time
 your release like a draw-weight pro.
 
+While a stone runs, the **stopwatch** (top-left) shows the split (SPL,
+release to near hog) and hog-to-hog (H-H) in *real curling seconds* —
+the clock runs on simulation time, so the numbers stay canonical no
+matter how fast the game plays back. Draws run ~13-14s hog-to-hog,
+takeouts ~7-9s, just like on real ice.
+
 ## The physics
 
 - Real sheet dimensions: 4.75 m wide, hog-to-hog 21.95 m, 1.83 m

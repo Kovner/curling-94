@@ -58,9 +58,17 @@ press('Enter'); release('Enter'); step(2);
 check('menu -> prethrow', G.state === 'prethrow');
 
 let frames = 0, throwsSeen = 0, lastState = '';
+const splits = [], hths = [];
 const MAXF = 60 * 60 * 30; // 30 sim-minutes cap
 while (G.state !== 'gameover' && frames < MAXF) {
-  if (G.state !== lastState) { if (G.state === 'slide') throwsSeen++; lastState = G.state; }
+  if (G.state !== lastState) {
+    if (G.state === 'slide') throwsSeen++;
+    if (lastState === 'slide' && G.watch) {
+      if (G.watch.split !== null) splits.push(G.watch.split);
+      if (G.watch.hth !== null) hths.push(G.watch.hth);
+    }
+    lastState = G.state;
+  }
   const human = !(G.mode === 1 && G.team === 1);
   const s = G.state;
   if (['prethrow', 'curl', 'aim', 'power', 'endscore'].includes(s)) {
@@ -79,6 +87,10 @@ check('scores are sane numbers',
   JSON.stringify(G.scores));
 check('a winner was declared', G.gameWinner === 0 || G.gameWinner === 1);
 check('renderer drew pixels', calls.fillRect > 1000);
+check('stopwatch recorded splits in real-curling range (2.5-5s)',
+  splits.length > 0 && splits.every(t => t > 2.5 && t < 5), JSON.stringify(splits.map(t => +t.toFixed(2))));
+check('stopwatch recorded hog-to-hog times in range (6-17s)',
+  hths.length > 0 && hths.every(t => t > 6 && t < 17), JSON.stringify(hths.map(t => +t.toFixed(2))));
 
 step(70); // splash ignores input for the first second
 press('Enter'); release('Enter'); step(2);

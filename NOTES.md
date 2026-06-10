@@ -142,6 +142,27 @@ weight stress with no reset between them. The oscillating meter gives
 you a beat to breathe and re-focus. (Weight-tick sounds removed with it;
 the stopwatch experiment is the real answer to weight judgment anyway.)
 
+### EXP-03: Stopwatch — canonical curling time (ACTIVE)
+
+**Hypothesis:** showing real interval times (independent of playback
+speed) lets weight be judged the way real curlers judge it, and turns
+ice speed into something you *learn* during a game — prerequisite for
+the living-ice item.
+
+**Build:** stopwatch panel (top-left, during the slide and after) runs
+on SIM seconds, so numbers are canonical curling times no matter the
+playback speed. SPL = release-to-near-hog split (real draw splits are
+~3.75-4.0s; ours read ~0.2-0.4 lower since the clock starts at release,
+not the back line). H-H = hog-to-hog, counting live between the lines,
+frozen once across (draws ~13-14, hits ~7-9). Click sound at each hog
+crossing. Shows on CPU throws too — that's how skips read the ice.
+
+**Ask:** do the numbers match your curling instincts? Is SPL+H-H enough
+to judge weight, or do you want a reference card (e.g. last few throws'
+times)?
+
+**Verdict:** _pending_
+
 ## Locked-in values
 
 - Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for
