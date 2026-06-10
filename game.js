@@ -562,24 +562,18 @@ function update(dt) {
         if (G.st > 1.1) { G.aimAng = G.cpu.ang; G.power = 0; sfxLock(); setState('power'); }
       } else {
         G.aimAng = Math.sin(G.st * TUNE.aimSpeed) * (TUNE.aimRange * Math.PI / 180);
-        // press AND HOLD: locking the broom rolls straight into the weight bar
         if (tap('Space') || tap('Enter')) { G.power = 0; sfxLock(); setState('power'); }
       }
       break;
     }
     case 'power': {
-      const prevV = vOfPower(G.power);
       if (G.cpuTurn) {
         G.power = Math.min(G.cpu.p, G.st / TUNE.powerPeriod);
-        tickWeightMarks(prevV, vOfPower(G.power));
         if (G.power >= G.cpu.p) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
       } else {
-        G.power = Math.min(1, G.st / TUNE.powerPeriod);
-        tickWeightMarks(prevV, vOfPower(G.power));
-        // one motion: let go of the button to let go of the stone
-        if (!keys['Space'] && !keys['Enter']) {
-          G.vRelease = vOfPower(G.power); sfxLock(); startDelivery();
-        }
+        const ph = (G.st / TUNE.powerPeriod) % 1;
+        G.power = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+        if (tap('Space') || tap('Enter')) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
       }
       break;
     }
@@ -661,12 +655,6 @@ function update(dt) {
 }
 
 function startDelivery() { setState('deliver'); }
-
-// audible click as the rising weight bar crosses the guard/draw/back marks
-function tickWeightMarks(a, b) {
-  for (const m of [V_GUARD, V_DRAW, V_BACK])
-    if (a < m && b >= m) beep(1318, 0.05, 'square', 0.07);
-}
 
 function finishThrow() {
   const s = G.active;
@@ -992,7 +980,7 @@ function drawGame() {
   if (G.state === 'power') drawPowerMeter();
   drawSweepGauge();
   if (G.state === 'aim' && !G.cpuTurn)
-    drawText('PRESS + HOLD SPACE', W / 2, 228, '#fcfcfc', 1, 'center');
+    drawText('SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
   if (G.state === 'curl') {
     px(W / 2 - 58, 152, 116, 30, '#00287c');
     px(W / 2 - 58, 152, 116, 1, '#fcfcfc'); px(W / 2 - 58, 181, 116, 1, '#fcfcfc');
@@ -1003,7 +991,7 @@ function drawGame() {
     drawText(ar, W / 2, 168, '#fcfcfc', 1, 'center');
   }
   if (G.state === 'power' && !G.cpuTurn && Math.floor(G.t * 6) % 2)
-    drawText('RELEASE TO THROW!', W / 2, 228, '#f8d878', 1, 'center');
+    drawText('SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
   drawFeelChip();
   drawFlash();
 }

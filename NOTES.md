@@ -134,14 +134,20 @@ Direct customer feedback, both about honesty and fluidity of the motion:
    weight can be judged by ear mid-hold (helps the "hard to judge
    weight" note without making it easier mechanically).
 
-**Verdict:** _pending_
+**Verdict (2026-06-09): SPLIT.** Handle-before-aim: ✅ keep. One-motion
+hold-release weight: ❌ "too hard" — reverted to the separate
+oscillating meter with a tap to lock. Lesson: continuous-motion inputs
+read as elegant on paper but the release timing stacked aim stress onto
+weight stress with no reset between them. The oscillating meter gives
+you a beat to breathe and re-focus. (Weight-tick sounds removed with it;
+the stopwatch experiment is the real answer to weight judgment anyway.)
 
 ## Locked-in values
 
 - Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for
   future reference.
-- Throw flow: handle → aim → hold-release weight (EXP-02, pending
-  verdict).
+- Throw flow: **handle → aim (tap) → oscillating weight meter (tap)**
+  (EXP-02 final).
 
 ## Raw feedback archive
 

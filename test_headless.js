@@ -63,14 +63,10 @@ while (G.state !== 'gameover' && frames < MAXF) {
   if (G.state !== lastState) { if (G.state === 'slide') throwsSeen++; lastState = G.state; }
   const human = !(G.mode === 1 && G.team === 1);
   const s = G.state;
-  if (['prethrow', 'curl', 'endscore'].includes(s)) {
+  if (['prethrow', 'curl', 'aim', 'power', 'endscore'].includes(s)) {
     if (human || s === 'endscore' || s === 'prethrow') {
       if (frames % 20 === 0) { press('Space'); release('Space'); }
     }
-  } else if (s === 'aim' && human) {
-    if (frames % 20 === 0) press('Space'); // press AND HOLD locks aim
-  } else if (s === 'power' && human) {
-    if (G.st > 0.65) release('Space');     // let go around draw weight
   } else if (s === 'slide' && human && frames % 8 === 0) {
     press('Space'); release('Space');
   }
