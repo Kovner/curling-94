@@ -265,7 +265,10 @@ const TEAMS = [
 // ---------------------------------------------------------- world constants (meters)
 const SHEET_HALF = 2.375;          // half sheet width
 const WALL_Z = SHEET_HALF - 0.05;  // side boards
-const RELEASE_Y = 1.5;             // stone release point
+const SLIDE_START = 0.8;           // stone sits here pre-throw, slide begins
+const NBACK = 1.83;                // near back line (hack to back line, real geometry)
+const NTEE = 3.66;                 // near tee line
+const RELEASE_Y = 3.6;             // release point at the near tee
 const NHOG = 10.0;                 // near hog line
 const FHOG = 31.95;                // far hog line
 const TEE = 38.35;                 // far tee (button)
@@ -284,19 +287,26 @@ const VIEW_M = H / SY;
 // curlK: bend strength | sweepAdd/Decay: mash response | sweepFriction/Curl: sweep effect
 const PROFILES = [
   { name:'CLASSIC', ts:2.4, aimSpeed:2.4, aimRange:4.2, powerPeriod:1.3,
-    curlK:0.0068, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
+    curlK:0.0113, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
   { name:'ARCADE',  ts:3.4, aimSpeed:3.2, aimRange:4.6, powerPeriod:0.95,
-    curlK:0.0055, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
+    curlK:0.0091, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
   { name:'SIM',     ts:1.7, aimSpeed:1.6, aimRange:3.6, powerPeriod:1.8,
-    curlK:0.0095, sweepAdd:0.25, sweepDecay:0.9, sweepFriction:0.82, sweepCurl:0.40 },
+    curlK:0.0158, sweepAdd:0.25, sweepDecay:0.9, sweepFriction:0.82, sweepCurl:0.40 },
   { name:'TWITCHY', ts:2.4, aimSpeed:4.6, aimRange:4.2, powerPeriod:0.75,
-    curlK:0.0068, sweepAdd:0.28, sweepDecay:1.8, sweepFriction:0.70, sweepCurl:0.30 },
+    curlK:0.0113, sweepAdd:0.28, sweepDecay:1.8, sweepFriction:0.70, sweepCurl:0.30 },
 ];
 let tuneIdx = 0;
 try { tuneIdx = Math.min(3, Math.max(0, +localStorage.getItem('c94feel') || 0)); } catch (e) {}
 let TUNE = PROFILES[tuneIdx];
 
-function curlG(v) { return Math.max(0.12, Math.min(1.55, 1.7 - 0.6 * v)); }
+// Curl engages only below ~2 m/s, so heavy weight runs dead straight
+// (shape calibrated against curling.gg's recommended model: zero lateral
+// force at speed, constant lateral accel once the stone slows, cutoff
+// when nearly stopped).
+function curlG(v) {
+  if (v < 0.08) return 0;
+  return Math.max(0, Math.min(1, (2.1 - v) / 0.4));
+}
 function vOfPower(p) { return VMIN + p * (VMAX - VMIN); }
 function powerOfV(v) { return (v - VMIN) / (VMAX - VMIN); }
 const V_DRAW = Math.sqrt(2 * A0 * (TEE - RELEASE_Y));            // stop on the button
@@ -311,7 +321,7 @@ const G = {
   end: 1, hammer: 1, scores: [0, 0],
   throwIdx: 0, stones: [], active: null,
   team: 0, cpuTurn: false, cpu: null,
-  aimAng: 0, spin: 1, power: 0, vRelease: 0,
+  aimAng: 0, spin: 1, power: 0, vRelease: 0, deliverY: SLIDE_START,
   sweep: 0, sweepTaps: 0,
   cam: -2, camTarget: -2,
   flash: null, banner: '', taunt: '',
@@ -347,7 +357,7 @@ function stepPhysics(rdt) {
       const cl = TUNE.curlK * s.spin * curlG(sp) * (1 - (1 - TUNE.sweepCurl) * sweep);
       s.vy += -uz * cl * dt; s.vz += uy * cl * dt;
       s.y += s.vy * dt; s.z += s.vz * dt;
-      s.rot += s.spin * Math.max(0.6, sp) * 1.6 * dt;
+      s.rot += s.spin * 0.7 * dt; // real stones turn ~2-3 times per throw at any weight
       // side boards
       if (Math.abs(s.z) + R > WALL_Z && s.alive) {
         s.alive = false; s.vy = s.vz = 0; G.events.out = true;
@@ -388,7 +398,8 @@ function stepPhysics(rdt) {
 
 // offline trajectory sim (AI planning + minimap projection). No collisions.
 function simShot(v, ang, spin, stopAtY) {
-  let y = RELEASE_Y, z = 0, vy = v * Math.cos(ang), vz = v * Math.sin(ang);
+  let y = RELEASE_Y, z = Math.sin(ang) * (RELEASE_Y - SLIDE_START);
+  let vy = v * Math.cos(ang), vz = v * Math.sin(ang);
   const dt = 0.06, pts = [{ y, z }];
   for (let i = 0; i < 12000; i++) {
     const sp = Math.hypot(vy, vz);
@@ -449,7 +460,7 @@ function nextThrow() {
   G.cpuTurn = (G.mode === 1 && G.team === 1);
   G.aimAng = 0; G.spin = 1; G.power = 0; G.sweep = 0;
   G.events = { contact: false, takeouts: 0, hogged: false, out: false };
-  G.watch = { run: 0, split: null, hogT: null, hth: null }; // sim-time stopwatch
+  G.watch = { started: false, run: 0, split: null, hogT: null, hth: null }; // sim-time stopwatch
   G.cpu = G.cpuTurn ? planCpu() : null;
   const T = TEAMS[G.team];
   G.taunt = T.taunts[(Math.random() * T.taunts.length) | 0];
@@ -580,9 +591,17 @@ function update(dt) {
     }
     case 'deliver': {
       G.camTarget = -2;
-      if (G.st > 0.55) {
+      // slide out of the hack at the throw's real speed
+      const prevDy = G.deliverY;
+      G.deliverY += G.vRelease * dt * TUNE.ts;
+      if (prevDy < NBACK && G.deliverY >= NBACK) {
+        G.watch.started = true; // stopwatch starts at the back line, like a real timer
+        beep(1760, 0.04, 'square', 0.05);
+      }
+      if (G.watch.started) G.watch.run += dt * TUNE.ts;
+      if (G.deliverY >= RELEASE_Y) {
         const s = {
-          team: G.team, y: RELEASE_Y, z: 0,
+          team: G.team, y: RELEASE_Y, z: Math.sin(G.aimAng) * (RELEASE_Y - SLIDE_START),
           vy: G.vRelease * Math.cos(G.aimAng),
           vz: G.vRelease * Math.sin(G.aimAng),
           spin: G.spin, rot: 0, alive: true, touched: false,
@@ -667,7 +686,7 @@ function update(dt) {
   for (const k in pressed) pressed[k] = 0;
 }
 
-function startDelivery() { setState('deliver'); }
+function startDelivery() { G.deliverY = SLIDE_START; setState('deliver'); }
 
 function finishThrow() {
   const s = G.active;
@@ -705,18 +724,14 @@ function drawRink() {
   }
   // centre line
   px(W / 2, 0, 1, H, '#a8c4d4');
-  // house (far end)
-  const hy = syOf(TEE);
-  if (hy > -90 && hy < H + 90) {
-    fillEllipse(W / 2, hy, (HOUSE_R * SX) | 0, (HOUSE_R * SY) | 0, '#3cbcfc');
-    fillEllipse(W / 2, hy, (1.22 * SX) | 0, (1.22 * SY) | 0, '#fcfcfc');
-    fillEllipse(W / 2, hy, (0.61 * SX) | 0, (0.61 * SY) | 0, '#d82800');
-    fillEllipse(W / 2, hy, (0.15 * SX) | 0, (0.15 * SY) | 0, '#fcfcfc');
-  }
-  // lines: near hog, far hog, tee, back
+  // houses at both ends
+  drawHouse(TEE);
+  drawHouse(NTEE);
+  // lines: hogs, tees, backs
   const lines = [
     [NHOG, '#d82800', 2], [FHOG, '#d82800', 2],
-    [TEE, '#607080', 1], [BACK, '#000000', 1], [0.4, '#607080', 1],
+    [TEE, '#607080', 1], [BACK, '#000000', 1],
+    [NTEE, '#607080', 1], [NBACK, '#000000', 1],
   ];
   for (const [ly, col, th] of lines) {
     const yy = syOf(ly);
@@ -733,6 +748,14 @@ function drawRink() {
   drawCrowd(left, right);
 }
 
+function drawHouse(teeY) {
+  const hy = syOf(teeY);
+  if (hy < -90 || hy > H + 90) return;
+  fillEllipse(W / 2, hy, (HOUSE_R * SX) | 0, (HOUSE_R * SY) | 0, '#3cbcfc');
+  fillEllipse(W / 2, hy, (1.22 * SX) | 0, (1.22 * SY) | 0, '#fcfcfc');
+  fillEllipse(W / 2, hy, (0.61 * SX) | 0, (0.61 * SY) | 0, '#d82800');
+  fillEllipse(W / 2, hy, (0.15 * SX) | 0, (0.15 * SY) | 0, '#fcfcfc');
+}
 const AD_COLORS = ['#d82800', '#0058f8', '#f8b800', '#00a800', '#fcfcfc'];
 function drawBoards(left, right) {
   px(left - 4, 0, 4, H, '#fcfcfc');
@@ -779,10 +802,11 @@ function drawStone(s) {
   px(x + hx - 1, y - 1 + hy, 2, 2, T.c2);
 }
 
-function drawThrower(frame) {
+function drawThrower(frame, wy) {
   const T = TEAMS[G.team];
   const pal = { H: T.c2, S: '#f8b888', J: T.c1, D: T.c2, P: '#404040', B: '#181818' };
-  const y = syOf(0) - 24;
+  const y = syOf(wy || 0) - 24;
+  if (y < 14 || y > H + 24) return;
   drawSprite(frame ? SPR_THROWER_LUNGE : SPR_THROWER_STAND, pal, W / 2 - 12, y, 2);
 }
 function drawSweepers() {
@@ -830,6 +854,8 @@ function drawMinimap(showPath) {
   px(mx, m2y(BACK), mw, 1, '#404040');
   fillEllipse(mx + mw / 2, m2y(TEE), 4, 4, '#3cbcfc');
   fillEllipse(mx + mw / 2, m2y(TEE), 2, 2, '#d82800');
+  fillEllipse(mx + mw / 2, m2y(NTEE), 3, 3, '#3cbcfc');
+  fillEllipse(mx + mw / 2, m2y(NTEE), 1, 1, '#d82800');
   if (showPath) {
     const v = G.state === 'power' ? vOfPower(G.power) : V_DRAW;
     const r = simShot(v, G.aimAng, G.spin);
@@ -850,21 +876,20 @@ function drawMinimap(showPath) {
 }
 
 function drawAimArrow() {
-  const x0 = sxOf(0), y0 = syOf(RELEASE_Y);
   for (let d = 0.7; d < 5.9; d += 0.28) {
     if (Math.floor(d / 0.56) % 2) continue;
-    const yy = RELEASE_Y + Math.cos(G.aimAng) * d;
+    const yy = SLIDE_START + Math.cos(G.aimAng) * d;
     const zz = Math.sin(G.aimAng) * d;
     px(sxOf(zz) - 1, syOf(yy) - 1, 3, 3, '#f87800');
   }
   // arrowhead
-  const zz = Math.sin(G.aimAng) * 6.3, yy = RELEASE_Y + Math.cos(G.aimAng) * 6.3;
+  const zz = Math.sin(G.aimAng) * 6.3, yy = SLIDE_START + Math.cos(G.aimAng) * 6.3;
   const ax = sxOf(zz), ay = syOf(yy);
   px(ax - 1, ay - 5, 3, 2, '#d82800');
   px(ax - 3, ay - 3, 7, 2, '#d82800');
   px(ax - 5, ay - 1, 11, 3, '#d82800');
-  // ghost stone at release
-  fillEllipse(x0, y0, 6, 5, 'rgba(124,124,124,0.7)');
+  // stone waiting in front of the hack
+  fillEllipse(sxOf(0), syOf(SLIDE_START), 6, 5, 'rgba(124,124,124,0.7)');
 }
 
 function drawPowerMeter() {
@@ -968,7 +993,7 @@ function drawMenu() {
   drawText('ARROWS: CHANGE  ENTER: GO', W / 2, 190, '#fcfcfc', 1, 'center');
 }
 function drawPrethrow() {
-  drawRink(); drawStones(); drawThrower(0); drawHud(); drawMinimap(false);
+  drawRink(); drawStones(); drawThrower(0, 0); drawHud(); drawMinimap(false);
   const T = TEAMS[G.team];
   px(16, 88, W - 32, 64, '#00287c');
   px(16, 88, W - 32, 2, T.c1); px(16, 150, W - 32, 2, T.c1);
@@ -983,11 +1008,19 @@ function drawGame() {
   drawRink();
   drawStones();
   if (['aim', 'curl', 'power'].includes(G.state)) {
-    drawThrower(0);
+    drawThrower(0, 0);
     drawAimArrow();
   }
-  if (G.state === 'deliver') drawThrower(1);
-  if (G.state === 'slide') drawSweepers();
+  if (G.state === 'deliver') {
+    drawThrower(1, G.deliverY - 0.9);
+    drawStone({ team: G.team, y: G.deliverY,
+      z: Math.sin(G.aimAng) * Math.max(0, G.deliverY - SLIDE_START),
+      rot: G.spin * G.st * 1.6 });
+  }
+  if (G.state === 'slide') {
+    drawThrower(1, RELEASE_Y - 0.9); // finishing the slide as the stone runs
+    drawSweepers();
+  }
   drawHud();
   drawMinimap(['aim', 'curl', 'power'].includes(G.state));
   if (G.state === 'power') drawPowerMeter();
@@ -1010,7 +1043,7 @@ function drawGame() {
   drawFlash();
 }
 function drawStopwatch() {
-  if (!G.watch || !['slide', 'postthrow'].includes(G.state)) return;
+  if (!G.watch || !['deliver', 'slide', 'postthrow'].includes(G.state)) return;
   const w = G.watch;
   if (w.split === null && w.run === 0) return;
   const x = 4, y = 26;

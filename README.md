@@ -64,9 +64,9 @@ takeouts ~7-9s, just like on real ice.
   that doesn't fully cross the far hog (and touched nothing) is pulled.
 - Stones decelerate at ~0.092 m/s² (championship-ice friction); draw
   weight, guard weight and takeout weight all fall out of `v²/2a`.
-- The handle curls the stone with a lateral force that grows as the
-  stone slows — most of the bend happens in the last metres, just like
-  real granite.
+- The handle curls the stone only once it slows below ~2 m/s (draws
+  bend ~4 feet, normal hits barely flinch, peels run dead straight) —
+  the curve shape is calibrated against curling.gg's simulator model.
 - Sweeping lowers effective friction (~28%) and kills most of the curl,
   so you can carry a light draw or hold a line through the curl.
 - Collisions conserve momentum (equal-mass, restitution 0.92): takeouts,

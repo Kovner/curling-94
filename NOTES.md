@@ -163,6 +163,32 @@ times)?
 
 **Verdict:** _pending_
 
+### EXP-04: Curl physics fix + near house + slide-out delivery (ACTIVE)
+
+**Bug (Mike):** heavy hits appeared to curl the wrong way; "a super
+heavy hit would just go dead straight." Investigation: the model never
+reverses direction (verified numerically — drift is always spin-ward),
+but the curl floor (curlG min 0.12 at any speed) gave hits a few cm of
+bend, and a locked-off-axis aim reads as wrong-way bend. Both bad.
+
+**Calibration source — curling.gg:** read their bundle. Their
+recommended curl model ("hybridSpeedDependent", ~5ft at tee): lateral
+accel ≈ ZERO above a speed threshold, CONSTANT below it, cutoff when
+nearly stopped (v<0.1). Adopted that shape in real units: curl engages
+below ~2.1 m/s (full by 1.7), zero above. Result: draw/guard ≈ 1.2m
+(4 ft) of curl, normal hit ≈ 4cm, peel ≈ 0.000m dead straight. Also
+fixed handle rotation to ~2-3 turns per throw at any weight (was
+speed-proportional and comically fast on hits).
+
+**Also (Mike):** near house + thrower slides out, for sim feel. Done:
+real near-end geometry (hack 0 → back line 1.83 → tee 3.66 → hog 10),
+both houses rendered, thrower glides hack→near-tee at the throw's
+actual speed and releases at the tee. Stopwatch now starts at the BACK
+LINE crossing like a real timer, so SPL is a true back-to-hog split
+(draws ~3.3s here vs 3.75-4.0 real — close, our release speed differs).
+
+**Verdict:** _pending (test with EXP-03 stopwatch)_
+
 ## Locked-in values
 
 - Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for
