@@ -207,6 +207,16 @@ crossing — curl now reads as deviation from the line, like real ice.
 Also relabeled the handle picker from IN/OUT (handedness-ambiguous) to
 CCW/CW + explicit 'CURLS LEFT/RIGHT'.
 
+**Addendum 3 (root cause found by Mike):** the minimap was projecting
+the curl-compensated landing point, training the player to aim the
+OUTCOME at the button instead of aiming the broom. On hits the
+projection is near-straight, so the target's meaning flipped between
+shot types — that's the "wrong way" feel. Fix: minimap now shows the
+straight broom line only (with broom marker at the tee crossing, same
+as on the ice). Calling the right amount of ice is the player's skill
+now, like real curling: draw = aim ~4ft wide, let it come home. No
+curl preview anywhere.
+
 **Verdict:** _pending (test with EXP-03 stopwatch)_
 
 ## Locked-in values

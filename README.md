@@ -47,9 +47,10 @@ meter difficulty, curl, sweeping) any time, even mid-throw. The active
 profile shows bottom-left and is remembered. See `NOTES.md` for the
 ongoing experiments.
 
-The minimap on the right shows the whole sheet, every stone, and (while
-aiming) your projected path — watch it bend as the meter moves and time
-your release like a draw-weight pro.
+The minimap on the right shows the whole sheet, every stone, and your
+**broom line** while you aim — a straight line, like a skip's broom. The
+stone curls off that line (~4 ft on a draw), so call your ice: aim a
+few feet wide of the button and let the handle bring it home.
 
 While a stone runs, the **stopwatch** (top-left) shows the split (SPL,
 release to near hog) and hog-to-hog (H-H) in *real curling seconds* —

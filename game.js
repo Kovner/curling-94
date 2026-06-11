@@ -881,14 +881,20 @@ function drawMinimap(showPath) {
   fillEllipse(mx + mw / 2, m2y(NTEE), 3, 3, '#3cbcfc');
   fillEllipse(mx + mw / 2, m2y(NTEE), 1, 1, '#d82800');
   if (showPath) {
-    const v = G.state === 'power' ? vOfPower(G.power) : V_DRAW;
-    const r = simShot(v, G.aimAng, G.spin);
+    // straight broom line only — like real curling, you aim the broom and
+    // judge the curl yourself (draws bend ~4ft, so call that much ice)
     ctx.fillStyle = '#f8d878';
-    for (let i = 0; i < r.pts.length; i += 2) {
-      const p = r.pts[i];
-      ctx.fillRect(mx + mw / 2 + p.z * (mw / (SHEET_HALF * 2)) * 0.9, m2y(p.y), 1, 1);
+    const zPerM = (mw / (SHEET_HALF * 2)) * 0.9;
+    for (let d = 0; d < 42; d += 1.6) {
+      const yy = SLIDE_START + Math.cos(G.aimAng) * d;
+      const zz = Math.sin(G.aimAng) * d;
+      if (Math.abs(zz) > SHEET_HALF || yy > BACK) break;
+      ctx.fillRect(mx + mw / 2 + zz * zPerM, m2y(yy), 1, 1);
     }
-    px(mx + mw / 2 + r.z * (mw / (SHEET_HALF * 2)) * 0.9 - 1, m2y(r.y) - 1, 3, 3, '#f87800');
+    // broom marker at the tee-line crossing
+    const bz = Math.sin(G.aimAng) * (TEE - SLIDE_START);
+    if (Math.abs(bz) < SHEET_HALF)
+      px(mx + mw / 2 + bz * zPerM - 1, m2y(TEE) - 1, 3, 3, '#f87800');
   }
   for (const s of G.stones) {
     if (!s.alive) continue;
