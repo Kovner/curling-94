@@ -219,6 +219,28 @@ curl preview anywhere.
 
 **Verdict:** _pending (test with EXP-03 stopwatch)_
 
+### EXP-05: Skip cam + 14s ice (ACTIVE)
+
+**Feedback (Mike):** aiming too hard — minimap too small to place the
+broom precisely. And draw-to-button was reading 13.2 H-H; should
+average ~14.0 (occasionally 13.5, occasionally 15.0).
+
+**Build:**
+- **Skip cam**: big house close-up panel (top centre) during
+  aim/handle/weight, with the broom + dotted line sweeping across it.
+  You call the shot from the house like a skip — ~12x the lateral
+  resolution of the minimap. Also slowed the CLASSIC aim arrow a touch
+  (2.4 -> 2.0 rad/s).
+- **Ice speed**: A0 0.092 -> 0.080. Draw-to-button now exactly 14.0
+  H-H with a 3.77 split (real table: 3.85). Curl rescaled to 4.8 ft on
+  a draw; peels still 0.000m.
+
+**Living-ice spec from the customer (for the backlog item):** per-game
+base mostly 14.0, occasionally 13.5 or 15.0; with ice evolution, often
+13.0-13.5 on the first few rocks of a game, then the sheet keens up.
+
+**Verdict:** _pending_
+
 ## Locked-in values
 
 - Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for

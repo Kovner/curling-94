@@ -276,7 +276,7 @@ const BACK = 40.18;                // back line
 const WLEN = 41.6;                 // playable world length
 const HOUSE_R = 1.83;              // 12-foot ring
 const R = 0.25;                    // stone radius (chunky arcade granite)
-const A0 = 0.092;                  // base ice deceleration m/s^2
+const A0 = 0.080;                  // ice deceleration: draw-to-button = 14.0s hog-to-hog
 const SX = 28, SY = 22;            // pixels per meter (NHL-style wide look)
 const SHEET_PX = SHEET_HALF * 2 * SX;
 const VMIN = 1.2, VMAX = 4.1;      // power meter velocity range
@@ -286,14 +286,14 @@ const VIEW_M = H / SY;
 // ts: time scale | aimSpeed/aimRange: arrow oscillation | powerPeriod: meter cycle
 // curlK: bend strength | sweepAdd/Decay: mash response | sweepFriction/Curl: sweep effect
 const PROFILES = [
-  { name:'CLASSIC', ts:2.4, aimSpeed:2.4, aimRange:4.2, powerPeriod:1.3,
-    curlK:0.0113, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
+  { name:'CLASSIC', ts:2.4, aimSpeed:2.0, aimRange:4.2, powerPeriod:1.3,
+    curlK:0.0105, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
   { name:'ARCADE',  ts:3.4, aimSpeed:3.2, aimRange:4.6, powerPeriod:0.95,
-    curlK:0.0091, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
+    curlK:0.0085, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
   { name:'SIM',     ts:1.7, aimSpeed:1.6, aimRange:3.6, powerPeriod:1.8,
-    curlK:0.0158, sweepAdd:0.25, sweepDecay:0.9, sweepFriction:0.82, sweepCurl:0.40 },
+    curlK:0.0147, sweepAdd:0.25, sweepDecay:0.9, sweepFriction:0.82, sweepCurl:0.40 },
   { name:'TWITCHY', ts:2.4, aimSpeed:4.6, aimRange:4.2, powerPeriod:0.75,
-    curlK:0.0113, sweepAdd:0.28, sweepDecay:1.8, sweepFriction:0.70, sweepCurl:0.30 },
+    curlK:0.0105, sweepAdd:0.28, sweepDecay:1.8, sweepFriction:0.70, sweepCurl:0.30 },
 ];
 let tuneIdx = 0;
 try { tuneIdx = Math.min(3, Math.max(0, +localStorage.getItem('c94feel') || 0)); } catch (e) {}
@@ -846,6 +846,44 @@ function drawAimLine() {
   }
 }
 
+// Skip's-eye view: big house close-up shown while aiming, with the broom
+// marker sweeping across it — you call the shot from the house like a skip.
+function drawSkipView() {
+  const pw = 112, ph = 76, x0 = ((W - pw) / 2) | 0, y0 = 26;
+  const KX = pw / (SHEET_HALF * 2 + 0.3), KY = 14;
+  const cx = x0 + pw / 2, cy = y0 + 47; // tee line row
+  px(x0 - 1, y0 - 1, pw + 2, ph + 2, '#fcfcfc');
+  px(x0, y0, pw, ph, '#dcecf4');
+  // back line, rings, lines
+  px(x0, (cy - NBACK * KY) | 0, pw, 1, '#181818');
+  fillEllipse(cx, cy, (HOUSE_R * KX) | 0, (HOUSE_R * KY) | 0, '#3cbcfc');
+  fillEllipse(cx, cy, (1.22 * KX) | 0, (1.22 * KY) | 0, '#fcfcfc');
+  fillEllipse(cx, cy, (0.61 * KX) | 0, (0.61 * KY) | 0, '#d82800');
+  fillEllipse(cx, cy, (0.15 * KX) | 0, (0.15 * KY) | 0, '#fcfcfc');
+  px(x0, cy, pw, 1, '#607080');
+  px(cx, y0, 1, ph, '#a8c4d4');
+  // stones in/near the house
+  for (const s of G.stones) {
+    if (!s.alive) continue;
+    const dy = s.y - TEE;
+    if (Math.abs(dy) > 3.1 || Math.abs(s.z) > 2.3) continue;
+    const sx = cx + s.z * KX, sy = cy - dy * KY;
+    fillEllipse(sx, sy, 4, 3, '#7c7c7c');
+    fillEllipse(sx, sy - 1, 3, 2, TEAMS[s.team].c1);
+  }
+  // broom line + broom at the tee crossing
+  const bz = Math.sin(G.aimAng) * (TEE - SLIDE_START);
+  const bx = (cx + bz * KX) | 0;
+  if (bx > x0 + 1 && bx < x0 + pw - 2) {
+    ctx.fillStyle = '#f8d878';
+    for (let yy = y0 + 2; yy < y0 + ph - 2; yy += 4) ctx.fillRect(bx, yy, 1, 2);
+    px(bx, cy - 9, 1, 8, '#c89858');
+    px(bx - 2, cy - 2, 5, 3, '#d82800');
+    px(bx - 2, cy + 1, 5, 1, '#f8d878');
+  }
+  drawText('SKIP CAM', x0 + 2, y0 + ph - 7, '#00287c');
+}
+
 function drawHud() {
   px(0, 0, W, 21, '#00287c');
   px(0, 21, W, 1, '#fcfcfc');
@@ -1041,6 +1079,7 @@ function drawGame() {
   if (['aim', 'curl', 'power'].includes(G.state)) {
     drawThrower(0, 0);
     drawAimArrow();
+    drawSkipView();
   }
   if (G.state === 'deliver') {
     drawThrower(1, G.deliverY - 0.9);
