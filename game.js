@@ -307,11 +307,34 @@ function curlG(v) {
   if (v < 0.08) return 0;
   return Math.max(0, Math.min(1, (2.1 - v) / 0.4));
 }
-function vOfPower(p) { return VMIN + p * (VMAX - VMIN); }
-function powerOfV(v) { return (v - VMIN) / (VMAX - VMIN); }
 const V_DRAW = Math.sqrt(2 * A0 * (TEE - RELEASE_Y));            // stop on the button
 const V_GUARD = Math.sqrt(2 * A0 * (FHOG + 2.5 - RELEASE_Y));    // stop between hog & house
 const V_BACK = Math.sqrt(2 * A0 * (BACK - RELEASE_Y));           // stop at back line
+const V_HOG = Math.sqrt(2 * A0 * (FHOG - RELEASE_Y));            // barely reaches far hog
+const V_FRONT = Math.sqrt(2 * A0 * (TEE - HOUSE_R - RELEASE_Y)); // stop at front of house
+// The meter is linear in STOP POSITION through the finesse zone, not in
+// velocity — stopping distance goes with v^2, so a velocity-linear bar
+// squeezed the entire house into ~7% of its travel. Bands:
+//   0..P_HOG      short/hogged ramp
+//   P_HOG..P_BACKX  placement zone, linear in stop position hog->back line
+//   P_BACKX..1      hit weights (takeouts are tolerant, they get less bar)
+const P_HOG = 0.12, P_BACKX = 0.68;
+function vOfPower(p) {
+  if (p <= P_HOG) return 1.4 + (V_HOG - 1.4) * (p / P_HOG);
+  if (p <= P_BACKX) {
+    const yStop = FHOG + (BACK - FHOG) * ((p - P_HOG) / (P_BACKX - P_HOG));
+    return Math.sqrt(2 * A0 * (yStop - RELEASE_Y));
+  }
+  return V_BACK + (VMAX - V_BACK) * ((p - P_BACKX) / (1 - P_BACKX));
+}
+function powerOfV(v) {
+  if (v <= V_HOG) return Math.max(0, (v - 1.4) / (V_HOG - 1.4)) * P_HOG;
+  if (v <= V_BACK) {
+    const yStop = RELEASE_Y + (v * v) / (2 * A0);
+    return P_HOG + (P_BACKX - P_HOG) * ((yStop - FHOG) / (BACK - FHOG));
+  }
+  return P_BACKX + (1 - P_BACKX) * Math.min(1, (v - V_BACK) / (VMAX - V_BACK));
+}
 
 // ---------------------------------------------------------- game state
 const G = {
@@ -966,9 +989,9 @@ function drawPowerMeter() {
   px(mx - 1, my - 1, mw + 2, mh + 2, '#fcfcfc');
   px(mx, my, mw, mh, '#181818');
   const yOfV = v => my + mh - powerOfV(v) * mh;
-  // zones
-  px(mx, yOfV(V_BACK), mw, Math.max(2, yOfV(V_GUARD) - yOfV(V_BACK)), '#00a800'); // house weight
-  px(mx, yOfV(V_GUARD), mw, Math.max(2, yOfV(VMIN + 0.9) - yOfV(V_GUARD)), '#f8b800'); // guard
+  // zones: short (dark), guard (yellow), house (green), hits (red)
+  px(mx, yOfV(V_FRONT), mw, Math.max(2, yOfV(V_HOG) - yOfV(V_FRONT)), '#f8b800'); // guard
+  px(mx, yOfV(V_BACK), mw, Math.max(2, yOfV(V_FRONT) - yOfV(V_BACK)), '#00a800'); // house
   px(mx, my, mw, Math.max(2, yOfV(V_BACK) - my), '#d82800'); // takeout
   // draw-weight tick
   px(mx - 2, yOfV(V_DRAW), mw + 4, 1, '#fcfcfc');
@@ -977,9 +1000,9 @@ function drawPowerMeter() {
   px(mx + 3, my + mh - lvl, mw - 6, lvl, '#fcfcfc');
   px(mx - 2, my + mh - lvl - 1, mw + 4, 2, '#f87800');
   drawText('PWR', mx + mw / 2, my - 8, '#fcfcfc', 1, 'center');
-  drawText('HIT', mx + mw + 3, yOfV(V_BACK + 0.5) | 0, '#f87858');
+  drawText('HIT', mx + mw + 3, yOfV(V_BACK + 0.7) | 0, '#f87858');
   drawText('DRW', mx + mw + 3, yOfV(V_DRAW) - 2 | 0, '#80d010');
-  drawText('GRD', mx + mw + 3, yOfV(V_GUARD + 0.05) | 0, '#f8d878');
+  drawText('GRD', mx + mw + 3, (yOfV(V_HOG) + yOfV(V_FRONT)) / 2 - 2 | 0, '#f8d878');
 }
 
 function drawSweepGauge() {

@@ -239,6 +239,20 @@ average ~14.0 (occasionally 13.5, occasionally 15.0).
 base mostly 14.0, occasionally 13.5 or 15.0; with ice evolution, often
 13.0-13.5 on the first few rocks of a game, then the sheet keens up.
 
+**Verdict (2026-06-13):** aiming "way better" — skip cam locked in.
+New issue → EXP-06.
+
+### EXP-06: Stop-position weight meter (ACTIVE)
+
+**Feedback (Mike):** weight control too hard, draw area of the bar
+really small. Root cause: bar was linear in velocity but stop distance
+goes with v² — the entire house occupied ~7% of the bar (button window
+~10ms). Rebuild: the meter is now linear in STOP POSITION through the
+finesse zone — hog-to-back-line placement gets 56% of the bar (draw
+tick at p=0.555), hit weights compressed into the top 32%, short/hogged
+bottom 12%. Button window now ~45ms (5x). Zones redrawn from the same
+mapping so GRD/house/DRW/HIT are all big and honest.
+
 **Verdict:** _pending_
 
 ## Locked-in values
