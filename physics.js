@@ -88,6 +88,7 @@ function stepWorld(stones, dt, ice, active, sweep, events) {
   for (const s of stones) {
     if (!s.alive) continue;
     if (!stepStone(s, dt, ice, s === active ? sweep : 0)) continue;
+    if (ice.wearUnder) ice.wearUnder(s.y, s.z, Math.hypot(s.vy, s.vz) * dt);
     if (Math.abs(s.z) + R > WALL_Z) {
       s.alive = false; s.vy = s.vz = 0;
       events.push({ type: 'boards', stone: s });
@@ -231,6 +232,104 @@ function powerOfV(v) {
   return P_BACKX + (1 - P_BACKX) * Math.min(1, (v - V_BACK) / (V_MAX - V_BACK));
 }
 
+// ---------------------------------------------------------- living ice
+// Uniform ice of deceleration a gives a draw to the button this hog-to-hog
+// time, and vice versa (constant deceleration from each hog line to the tee).
+const HTH_K = Math.sqrt(TEE - NHOG) - Math.sqrt(TEE - FHOG);
+function decelForHth(seconds) { return 2 * HTH_K * HTH_K / (seconds * seconds); }
+function hthForDecel(a) { return Math.sqrt(2 / a) * HTH_K; }
+// Curl coefficient that bends a draw `feet` on uniform ice of deceleration a
+// (4.8 ft on nominal ice; slower ice gives the stone less time to curl).
+function curlForFeet(feet, a) { return ICE_CURL * (feet / 4.8) * (a / ICE_DECEL) * (a / ICE_DECEL); }
+
+const NOISE_NY = 8, NOISE_NZ = 4;            // coarse patches: ~6m long, ~1.6m wide
+const WEAR_NY = 42, WEAR_NZ = 20;            // traffic grid: 1m x 0.25m cells
+function noiseGrid(rng) {
+  const g = new Float32Array((NOISE_NY + 1) * (NOISE_NZ + 1));
+  for (let i = 0; i < g.length; i++) g[i] = rng() * 2 - 1;
+  return g;
+}
+function smooth(t) { return t * t * (3 - 2 * t); }
+function noiseAt(g, y, z) {
+  const fy = Math.max(0, Math.min(NOISE_NY - 1e-6, (y / WLEN) * NOISE_NY));
+  const fz = Math.max(0, Math.min(NOISE_NZ - 1e-6, ((z + SHEET_HALF) / (SHEET_HALF * 2)) * NOISE_NZ));
+  const iy = Math.floor(fy), iz = Math.floor(fz), ty = smooth(fy - iy), tz = smooth(fz - iz);
+  const at = (a, b) => g[a * (NOISE_NZ + 1) + b];
+  return (at(iy, iz) * (1 - tz) + at(iy, iz + 1) * tz) * (1 - ty) +
+         (at(iy + 1, iz) * (1 - tz) + at(iy + 1, iz + 1) * tz) * ty;
+}
+
+// One game's sheet, generated from a seed. What changes it:
+//   between games   base speed (mostly ~14.0s hog-to-hog, sometimes ~13.5 or
+//                   ~15.0), how much it curls, which side swings more, and
+//                   where the keen and heavy patches are
+//   during a game   fresh pebble starts 0.6-0.9s slow and keens up over the
+//                   first handful of stones; much later it breaks down and
+//                   goes slower and straighter again
+//   where you throw the outside edges are frosty, and every stone polishes
+//                   the lane it travels, which gets quicker and straighter
+// Call stoneThrown() after each delivery.
+function makeLivingIce(seed) {
+  const rng = makeRng(seed);
+  const pick = rng();
+  const baseHth = (pick < 0.6 ? 14.0 : pick < 0.8 ? 13.5 : 15.0) + (rng() - 0.5) * 0.3;
+  const fresh = 0.6 + rng() * 0.3;
+  const breakAt = 40 + Math.floor(rng() * 16);
+  const curlFeet = 4.8 + (baseHth - 14) * 0.8 + (rng() - 0.5) * 0.8;
+  const curl0 = curlForFeet(curlFeet, decelForHth(baseHth));
+  const swingSide = (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.5);
+  const speedPatches = noiseGrid(rng), curlPatches = noiseGrid(rng);
+  const wear = new Float32Array(WEAR_NY * WEAR_NZ);
+  let thrown = 0, decelNow = 0, curlNow = 0;
+
+  function breakdown() { return Math.min(0.6, Math.max(0, thrown - breakAt) * 0.02); }
+  function hthNow() { return baseHth - fresh * Math.exp(-thrown / 3.5) - breakdown(); }
+  function refresh() {
+    decelNow = decelForHth(hthNow());
+    curlNow = curl0 * (1 - 0.25 * breakdown() / 0.6);
+  }
+  function wearCell(y, z) {
+    const iy = Math.floor(y), iz = Math.floor((z + SHEET_HALF) / 0.25);
+    return iy < 0 || iy >= WEAR_NY || iz < 0 || iz >= WEAR_NZ ? -1 : iy * WEAR_NZ + iz;
+  }
+  function wearAt(y, z) { const c = wearCell(y, z); return c < 0 ? 0 : wear[c]; }
+  refresh();
+
+  return {
+    seed, baseHth, curlFeet, swingSide,
+    get stonesThrown() { return thrown; },
+    hthNow,
+    decelAt(y, z) {
+      const edge = Math.abs(z) / SHEET_HALF;
+      return decelNow * (1 + 0.035 * noiseAt(speedPatches, y, z) + 0.07 * edge * edge * edge * edge)
+                      * (1 - 0.045 * wearAt(y, z));
+    },
+    curlAt(y, z) {
+      return curlNow * (1 + 0.22 * swingSide * (z / SHEET_HALF) + 0.08 * noiseAt(curlPatches, y, z))
+                     * (1 - 0.12 * wearAt(y, z));
+    },
+    // a stone travelled `dist` metres here: ten passes polish a lane fully
+    wearUnder(y, z, dist) {
+      for (const [dz, k] of [[0, 0.1], [-0.25, 0.05], [0.25, 0.05]]) {
+        const c = wearCell(y, z + dz);
+        if (c >= 0) wear[c] = Math.min(1, wear[c] + dist * k);
+      }
+    },
+    wearAt,
+    stoneThrown() { thrown++; refresh(); },
+    // What the icemaker tells both teams before the game: rounded, and
+    // silent about the fresh pebble, the patches and the swingy side.
+    report() {
+      const hth = Math.round(baseHth * 2) / 2, feet = Math.round(curlFeet * 2) / 2;
+      return {
+        hth, feet,
+        speed: hth >= 14.5 ? 'QUICK' : hth <= 13.5 ? 'HEAVY' : 'NORMAL',
+        swing: feet >= 5.5 ? 'SWINGY' : feet <= 4 ? 'STRAIGHT' : 'NORMAL',
+      };
+    },
+  };
+}
+
 // ---------------------------------------------------------- seeded randomness
 // mulberry32: small, fast, and reproducible from a 32-bit seed.
 function makeRng(seed) {
@@ -248,7 +347,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SHEET_HALF, WALL_Z, SLIDE_START, NBACK, NTEE, RELEASE_Y, NHOG, FHOG, TEE, BACK, WLEN,
     HOUSE_R, R, V_STOP, RESTITUTION, SWEEP_FRICTION, SWEEP_CURL, SPIN_RATE,
-    ICE_DECEL, ICE_CURL, makeIce, curlGate, isMoving, stepStone, stepWorld,
+    ICE_DECEL, ICE_CURL, makeIce, makeLivingIce, decelForHth, hthForDecel, curlForFeet, curlGate, isMoving, stepStone, stepWorld,
     simulateStone, releasedStone, simulateShot, solveAim, speedToStopAt, coastDistance,
     V_MIN, V_MAX, P_HOG, P_BACKX, V_HOG, V_BACK, vOfPower, powerOfV, makeRng,
   };

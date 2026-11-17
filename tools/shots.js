@@ -34,18 +34,16 @@ const outDir = path.join(root, 'shots');
   await shot('1-title');
   await key('Enter'); await waitState('menu'); await page.waitForTimeout(200);
   await shot('2-menu');
-  await key('Enter');
-  if (await state() === 'icereport' || await game(() => window.__C94.state === 'icereport')) {
-    await page.waitForTimeout(300); await shot('2b-ice-report'); await key('Space');
-  }
-  await waitState('prethrow'); await page.waitForTimeout(400);
-  await shot('3-prethrow');
+  await key('Enter'); await waitState('icereport'); await page.waitForTimeout(600);
+  await shot('3-ice-report');
+  await key('Space'); await waitState('prethrow'); await page.waitForTimeout(400);
   await key('Space'); await waitState('curl'); await page.waitForTimeout(200);
   await shot('4-handle');
   await key('Space'); await waitState('aim'); await page.waitForTimeout(500);
   await shot('5-aim');
+  await waitFor(() => Math.abs(window.__C94.aimAng) < 0.006, 'the arrow to cross the centre line');
   await key('Space'); await waitState('power');
-  await waitFor(() => window.__C94.power >= 0.5, 'draw weight on the bar');
+  await waitFor(() => window.__C94.power >= 0.62, 'a firm draw on the bar');
   await shot('6-weight');
   await key('Space'); await waitState('slide');
   await waitFor(() => window.__C94.watch.split !== null, 'the near hog line');
@@ -53,6 +51,11 @@ const outDir = path.join(root, 'shots');
   await shot('7-sweep');
   await waitState('postthrow', 60000); await page.waitForTimeout(900);
   await shot('8-house');
+
+  // let the CPU throw, so the stopwatch shows the previous stone's time
+  await waitFor(() => window.__C94.cpuTurn && window.__C94.state === 'slide' && window.__C94.watch.split !== null, 'the CPU stone', 60000);
+  await page.waitForTimeout(500);
+  await shot('8b-cpu-stone');
 
   // play out the end with quick throws to reach the scoreboard
   for (let guard = 0; guard < 6000; guard++) {

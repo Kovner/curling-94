@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const P = require('../physics.js');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -23,7 +24,7 @@ globalThis.requestAnimationFrame = () => {};
 // index.html's own script list, in order, exactly as the browser loads it
 vm.runInThisContext(
   scripts.map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') +
-  '\n;globalThis.__T = { G, update, draw, seedGame, evalEnd, setThrowMode, vOfPower };',
+  '\n;globalThis.__T = { G, update, draw, seedGame, evalEnd, setThrowMode, vOfPower, cpuWatchIce, planCpu };',
   { filename: 'game-bundle.js' });
 const T = globalThis.__T, G = T.G;
 
@@ -44,6 +45,9 @@ test('a full seeded game against the CPU plays through to a winner', () => {
   tapKey('ArrowDown'); step(1); tapKey('ArrowLeft'); step(1); // stones: 4 -> 2
   assert.equal(G.rocksPer, 2);
   tapKey('Enter'); step(2);
+  assert.equal(G.state, 'icereport');
+  assert.ok(G.ice.report().hth >= 13.5 && G.ice.report().hth <= 15);
+  step(30); tapKey('Space'); step(2);
   assert.equal(G.state, 'prethrow');
 
   let frames = 0, throwsSeen = 0, lastState = '';
@@ -81,7 +85,7 @@ test('a full seeded game against the CPU plays through to a winner', () => {
 test('the same seed replays the same game', () => {
   const play = seed => {
     T.seedGame(seed);
-    tapKey('Enter'); step(2); tapKey('Enter'); step(2);
+    tapKey('Enter'); step(2); tapKey('Enter'); step(40);
     const log = [];
     for (let f = 0; f < 60 * 60 * 30 && G.state !== 'gameover'; f++) {
       if (f % 20 === 0 && G.state !== 'slide') tapKey('Space');
@@ -108,7 +112,8 @@ test('scoring counts stones closer than the opponent\'s best', () => {
 test('HOLD throw mode: one pass of the bar, released with the key', () => {
   const toAim = () => {
     T.seedGame(3);
-    tapKey('Enter'); step(2); tapKey('Enter'); step(2);     // title -> menu -> first throw
+    tapKey('Enter'); step(2); tapKey('Enter'); step(40);    // title -> menu -> ice report
+    tapKey('Space'); step(2);                               // report -> first throw
     tapKey('Space'); step(2); tapKey('Space'); step(2);     // banner -> handle -> aim
     assert.equal(G.state, 'aim');
   };
@@ -133,4 +138,38 @@ test('HOLD throw mode: one pass of the bar, released with the key', () => {
   release('Space');
   backToTitle();
   T.setThrowMode(0);
+});
+
+test('the CPU skip learns the ice by watching stones', () => {
+  T.seedGame(2026);
+  tapKey('Enter'); step(2); tapKey('Enter'); step(40);
+  assert.equal(G.state, 'icereport');
+  const truth = () => { const v = P.speedToStopAt(G.ice, P.TEE); return (v * v) / (2 * (P.TEE - P.RELEASE_Y)); };
+  const report = G.ice.report();
+  assert.equal(G.cpuIce.decel, P.decelForHth(report.hth), 'starts from the icemaker\'s report');
+  const errorAtFirstStone = Math.abs(G.cpuIce.decel - truth());
+  assert.ok(errorAtFirstStone > 0.004, 'the report is wrong about fresh pebble');
+  for (let i = 0; i < 6; i++) { G.ice.stoneThrown(); T.cpuWatchIce(); }
+  assert.ok(Math.abs(G.cpuIce.decel - truth()) < errorAtFirstStone / 5, 'belief has closed in on the sheet');
+  G.state = 'gameover'; G.st = 2; G.gameWinner = 0; tapKey('Enter'); step(2);
+});
+
+test('perfect ice is the nominal sheet, with no report', () => {
+  const toggleIce = () => {
+    tapKey('Enter'); step(2);
+    assert.equal(G.state, 'menu');
+    while (G.menuSel !== 3) { tapKey('ArrowDown'); step(1); }   // the ICE row
+    tapKey('ArrowRight'); step(1);
+  };
+  T.seedGame(5);
+  toggleIce();
+  assert.equal(G.livingIce, false);
+  tapKey('Enter'); step(2);
+  assert.equal(G.state, 'prethrow');
+  assert.equal(G.ice.decelAt(20, 1), P.ICE_DECEL);
+  assert.equal(G.ice.curlAt(20, 1), P.ICE_CURL);
+  G.state = 'gameover'; G.st = 2; G.gameWinner = 0; tapKey('Enter'); step(2);
+  toggleIce();
+  assert.equal(G.livingIce, true);
+  G.state = 'title';
 });

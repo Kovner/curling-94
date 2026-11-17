@@ -302,9 +302,12 @@ function seedGame(n) { rand = makeRng(n); }
 const G = {
   state: 'title', t: 0, st: 0,        // global time, state time
   mode: 1, rocksPer: 4, endsTotal: 2, // menu options
+  livingIce: true,                    // menu: a sheet that varies and changes, or perfect nominal ice
   menuSel: 0,
   end: 1, hammer: 1, scores: [0, 0],
   ice: makeIce(),                     // the sheet being played on
+  cpuIce: { decel: ICE_DECEL, curl: ICE_CURL }, // what the CPU skip believes the ice is doing
+  lastHth: null,                      // previous stone's hog-to-hog, for comparison
   throwIdx: 0, stones: [], active: null,
   team: 0, cpuTurn: false, cpu: null,
   aimAng: 0, spin: 1, power: 0, vRelease: 0, deliverY: SLIDE_START,
@@ -365,8 +368,18 @@ function evalEnd() {
 function resetGame() {
   G.scores = [0, 0]; G.end = 1; G.hammer = 1; G.extraEnd = false;
   G.gameWinner = -1;
-  G.ice = makeIce();
-  startEnd();
+  G.lastHth = null;
+  if (G.livingIce) {
+    G.ice = makeLivingIce(Math.floor(rand() * 0x100000000));
+    // the CPU starts from the same icemaker's report the player is shown
+    const r = G.ice.report(), decel = decelForHth(r.hth);
+    G.cpuIce = { decel, curl: curlForFeet(r.feet, decel) };
+    setState('icereport');
+  } else {
+    G.ice = makeIce();
+    G.cpuIce = { decel: ICE_DECEL, curl: ICE_CURL };
+    startEnd();
+  }
 }
 function startEnd() {
   G.stones = []; G.throwIdx = 0; G.active = null;
@@ -385,10 +398,20 @@ function nextThrow() {
 }
 
 // ---------------------------------------------------------- CPU brain
-// The CPU plans against the true ice (G.ice): it knows the sheet perfectly
-// and only its execution is noisy.
+// The CPU does not know the sheet. It plans against a belief (uniform ice
+// with one speed and one curl) that starts from the icemaker's report and
+// is corrected by watching every stone, so early in a game and on patchy
+// lines it misjudges the ice the way a player does.
+function cpuWatchIce() {
+  const v = speedToStopAt(G.ice, TEE);
+  const decel = (v * v) / (2 * (TEE - RELEASE_Y));   // what the centre line is really running at
+  let curl = 0;
+  for (const y of [28, 33, 37]) for (const z of [-0.8, 0, 0.8]) curl += G.ice.curlAt(y, z) / 9;
+  G.cpuIce.decel += 0.5 * (decel - G.cpuIce.decel);
+  G.cpuIce.curl += 0.5 * (curl - G.cpuIce.curl);
+}
 function planCpu() {
-  const me = G.team, opp = 1 - me, ice = G.ice;
+  const me = G.team, opp = 1 - me, ice = makeIce(G.cpuIce);
   const shot = shotStone();
   const lastStone = (G.throwIdx >> 1) + 1 >= G.rocksPer;
   let plan;
@@ -447,7 +470,7 @@ function update(dt) {
     }
     case 'menu': {
       tickTune(dt);
-      const N = 4;
+      const N = 5;
       if (tap('ArrowUp'))   { G.menuSel = (G.menuSel + N - 1) % N; sfxMove(); }
       if (tap('ArrowDown')) { G.menuSel = (G.menuSel + 1) % N; sfxMove(); }
       const dir = tap('ArrowRight') ? 1 : tap('ArrowLeft') ? -1 : 0;
@@ -456,9 +479,15 @@ function update(dt) {
         if (G.menuSel === 0) G.mode = G.mode === 1 ? 2 : 1;
         if (G.menuSel === 1) { const o = [2, 4, 8], i = o.indexOf(G.rocksPer); G.rocksPer = o[(i + dir + 3) % 3]; }
         if (G.menuSel === 2) { const o = [1, 2, 4], i = o.indexOf(G.endsTotal); G.endsTotal = o[(i + dir + 3) % 3]; }
+        if (G.menuSel === 3) G.livingIce = !G.livingIce;
       }
-      const go = tap('Enter') || (tap('Space') && G.menuSel === 3);
+      const go = tap('Enter') || (tap('Space') && G.menuSel === 4);
       if (go) { sfxStart(); resetGame(); }
+      break;
+    }
+    case 'icereport': {
+      tickTune(dt);
+      if (G.st > 0.4 && (tap('Enter') || tap('Space'))) { sfxStart(); startEnd(); }
       break;
     }
     case 'prethrow': {
@@ -615,6 +644,9 @@ function finishThrow() {
     else if (s.y > FHOG && s.y < TEE - HOUSE_R) setFlash('GUARD UP!', '#3cbcfc', 1.2);
   }
   G.sweep = 0;
+  if (G.watch.hth !== null) G.lastHth = G.watch.hth;
+  if (G.ice.stoneThrown) G.ice.stoneThrown();
+  cpuWatchIce();
   setState('postthrow');
 }
 
@@ -950,10 +982,11 @@ function drawMenu() {
     ['MODE', G.mode === 1 ? 'VS CPU' : '2 PLAYER'],
     ['STONES', `${G.rocksPer} EACH`],
     ['ENDS', String(G.endsTotal)],
+    ['ICE', G.livingIce ? 'LIVING' : 'PERFECT'],
     ['START!', ''],
   ];
   for (let i = 0; i < rows.length; i++) {
-    const y = 78 + i * 26;
+    const y = 72 + i * 22;
     const sel = G.menuSel === i;
     if (sel) {
       px(34, y - 4, W - 68, 14, '#d82800');
@@ -963,6 +996,29 @@ function drawMenu() {
     drawText(rows[i][1], W - 44, y, sel ? '#f8d878' : '#9cc4dc', 1, 'right');
   }
   drawText('ARROWS: CHANGE  ENTER: GO', W / 2, 190, '#fcfcfc', 1, 'center');
+}
+// Pre-game card: what the icemaker tells both teams. Rounded, and silent
+// about the fresh pebble, the patches and the swingy side.
+function drawIceReport() {
+  const r = G.ice.report();
+  stripes('#00287c', '#0058f8', 18);
+  px(20, 34, W - 40, 172, '#181818');
+  px(20, 34, W - 40, 3, '#3cbcfc'); px(20, 203, W - 40, 3, '#3cbcfc');
+  drawTextSh('ICE REPORT', W / 2, 44, '#fcfcfc', '#0058f8', 3, 'center');
+  drawText("FROM TONIGHT'S ICEMAKER", W / 2, 66, '#9cc4dc', 1, 'center');
+  const rows = [
+    ['SPEED', r.speed, 'ABOUT ' + r.hth.toFixed(1) + ' HOG TO HOG'],
+    ['CURL', r.swing, 'ABOUT ' + r.feet + ' FEET ON A DRAW'],
+    ['PEBBLE', 'FRESH', 'SLOW AT FIRST, THEN IT KEENS UP'],
+  ];
+  rows.forEach(([label, word, detail], i) => {
+    const y = 82 + i * 33;
+    drawText(label, 34, y, '#9cc4dc');
+    drawTextSh(word, 34, y + 8, '#f8d878', '#000000', 2);
+    drawText(detail, 34, y + 22, '#fcfcfc');
+  });
+  drawText('THE REST YOU READ OFF YOUR STONES', W / 2, 184, '#9cc4dc', 1, 'center');
+  if (Math.floor(G.t * 3) % 2) drawText('SPACE TO CONTINUE', W / 2, 194, '#fcfcfc', 1, 'center');
 }
 function drawPrethrow() {
   drawRink(); drawStones(); drawThrower(0, 0); drawHud(); drawMinimap(false);
@@ -1020,16 +1076,17 @@ function drawStopwatch() {
   if (!G.watch || !['deliver', 'slide', 'postthrow'].includes(G.state)) return;
   const w = G.watch;
   if (w.split === null && w.run === 0) return;
-  const x = 4, y = 26;
-  px(x, y, 58, 30, '#00287c');
-  px(x, y, 58, 1, '#fcfcfc'); px(x, y + 29, 58, 1, '#fcfcfc');
+  const x = 4, y = 26, h = G.lastHth === null ? 30 : 39;
+  px(x, y, 58, h, '#00287c');
+  px(x, y, 58, 1, '#fcfcfc'); px(x, y + h - 1, 58, 1, '#fcfcfc');
   const fmt = t => t === null ? '--.-' : t.toFixed(1);
   drawText('SPL ' + fmt(w.split), x + 3, y + 4, w.split === null ? '#9cc4dc' : '#f8d878');
   // live hog-to-hog while the stone is between the lines, frozen once across
   let hh = w.hth;
   if (hh === null && w.hogT !== null && G.state === 'slide') hh = w.run - w.hogT;
   drawText('H-H ' + fmt(hh), x + 3, y + 13, w.hth === null ? '#9cc4dc' : '#f8d878');
-  drawText('SEC', x + 3, y + 22, '#3cbcfc');
+  if (G.lastHth !== null) drawText('PRV ' + fmt(G.lastHth), x + 3, y + 22, '#3cbcfc');
+  drawText('SEC', x + 3, y + h - 8, '#3cbcfc');
 }
 function drawLabChip() {
   const label = (throwModeIdx + 1) + '.' + throwMode().name;
@@ -1071,6 +1128,7 @@ function draw() {
   switch (G.state) {
     case 'title': drawTitle(); break;
     case 'menu': drawMenu(); break;
+    case 'icereport': drawIceReport(); break;
     case 'prethrow': drawPrethrow(); break;
     case 'endscore': drawEndScore(); break;
     case 'gameover': drawGameOver(); break;

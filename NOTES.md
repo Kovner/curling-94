@@ -13,22 +13,60 @@ Play URL: https://kovner.github.io/curling-94/ — auto-redeploys on every
 push to the branch (Pages enabled 2026-06-09). Hard-refresh if a new
 build doesn't show.
 
+## Where things stand (2026-11-17)
+
+Waiting on Mike's playtest of three things, all live:
+
+1. **EXP-07** unmarked, faster weight bar — is weight now judged from
+   the split?
+2. **EXP-08** throw lab (keys 1-3) — TAP vs HOLD vs HOLD FAST.
+3. **EXP-09** living ice — does the sheet feel alive and readable?
+
 ## Backlog (impact-on-fun order)
 
-1. **Core throw feel** — EXP-01 ✅ (CLASSIC) → EXP-02 flow rework (verdict pending)
-2. **Real curling timing & weight-by-eye** (Mike, 2026-06-09) — see
-   research below. Proposed BEFORE sweeping because sweep pacing depends
-   entirely on how long the ride is.
-3. **Sweeping** — input scheme (mash vs rhythm vs hold), rescue power —
-   re-tuned on top of real timing.
-4. **Living ice conditions** (Mike, 2026-06-09) — the big one; see
-   research below. Goal: simulate the *nature of playing a curling
-   game* — reading and adapting to ice — not just executing shots.
-5. **Collision/takeout drama** — impact feedback, shake, sound, slow-mo?
-6. **CPU personality & difficulty** — strategy variety, fairness, taunts;
-   must also *read the ice* once item 4 lands.
-7. **Presentation** — title, splashes, story beats between ends
-8. Holistic pass — pacing of a full end, scoring clarity
+1. ✅ Core throw feel — CLASSIC tuning (EXP-01), handle-first (EXP-02)
+2. ✅ Real curling timing — stopwatch in sim seconds (EXP-03), 14.0s ice
+   and skip cam (EXP-05)
+3. 🔬 Weight input — stop-position bar (EXP-06), unmarked (EXP-07),
+   one-pass hold variant (EXP-08)
+4. 🔬 Living ice — EXP-09 is the first cut; tune from playtests
+5. **Sweeping** — input scheme (mash vs rhythm vs hold) and how much a
+   sweep should rescue. Sweeping currently adds up to ~39% carry, which
+   on living ice hides a 3m misread of fresh pebble. Next lab.
+6. **Collision/takeout feedback** — impact shake, sound, freeze-frame
+7. **CPU depth** — more shot types, checks for guards in its path,
+   free-guard-zone rule for both sides, personality per skip
+8. **Story mode** (Mike, 2026-11-17: after the ice feels right) — a
+   Punch-Out style climb through named rival skips, each with a face,
+   a taunt and a play style, up to "The Tankard"
+9. Touch controls (keyboard-only today, so unplayable on a phone)
+10. Holistic pass — pacing of a full end, scoring clarity
+
+## Architecture (since the 2026-11-17 refactor)
+
+- `physics.js` is pure (no DOM, no game state): sheet geometry, the ice
+  model, the single stone integrator `stepStone`, collisions, offline
+  simulation, the weight scale, seeded RNG. Tests `require()` it.
+- **Ice is an object** with `decelAt(y, z)` and `curlAt(y, z)`. Nothing
+  reads a friction constant any more. `makeIce()` is uniform nominal
+  ice; `makeLivingIce(seed)` is a generated sheet (EXP-09).
+- **The weight bar is tied to nominal ice on purpose.** The same bar
+  position is always the same release speed; the ice on the day decides
+  where the stone stops. So on a slow sheet "draw position" comes up
+  short, exactly like a real thrower's muscle memory.
+- **The CPU does not know the sheet.** It plans against a belief
+  (`G.cpuIce`, uniform speed + curl) that starts from the icemaker's
+  report and moves halfway to the truth after every stone it watches.
+  Measured over 300 sheets: its first draw is ~3m light on fresh pebble
+  (rescued by sweeping), and it has the speed within ~17cm by stone 4.
+- All gameplay randomness goes through one seeded generator, so a game
+  replays exactly from its seed (`seedGame(n)`).
+- `game.js` is still one state-machine `switch` with CPU and human
+  logic interleaved per state. Untangle it when sweeping variants or
+  story mode next touch it.
+- The refactor was checked bit-for-bit against the old code on 103
+  recorded cases (stepped throws at 30/60/144 fps, a three-stone hit,
+  offline sims, aim solves, the meter curve) before anything changed.
 
 ## Research: real curling timing (for backlog item 2)
 
@@ -94,7 +132,7 @@ CPU must read ice too or it'll feel psychic/unfair.
 
 ## Experiment log
 
-### EXP-01: Throw feel sweep (ACTIVE)
+### EXP-01: Throw feel sweep (closed: CLASSIC won)
 
 **Hypothesis:** the core loop's fun is dominated by (a) how fast the stone
 ride feels and (b) meter speed = skill ceiling. Current CLASSIC tuning may
@@ -118,7 +156,7 @@ weight and you have to judge that" — difficulty is on the hard edge but
 the judgment is part of the game; don't soften it, make it more
 *judgeable* instead. Two flow changes requested → EXP-02.
 
-### EXP-02: Throw flow rework (ACTIVE)
+### EXP-02: Throw flow rework (closed: handle-first kept, hold-release rejected)
 
 Direct customer feedback, both about honesty and fluidity of the motion:
 
@@ -142,7 +180,7 @@ weight stress with no reset between them. The oscillating meter gives
 you a beat to breathe and re-focus. (Weight-tick sounds removed with it;
 the stopwatch experiment is the real answer to weight judgment anyway.)
 
-### EXP-03: Stopwatch — canonical curling time (ACTIVE)
+### EXP-03: Stopwatch — canonical curling time (closed: in use)
 
 **Hypothesis:** showing real interval times (independent of playback
 speed) lets weight be judged the way real curlers judge it, and turns
@@ -157,13 +195,12 @@ not the back line). H-H = hog-to-hog, counting live between the lines,
 frozen once across (draws ~13-14, hits ~7-9). Click sound at each hog
 crossing. Shows on CPU throws too — that's how skips read the ice.
 
-**Ask:** do the numbers match your curling instincts? Is SPL+H-H enough
-to judge weight, or do you want a reference card (e.g. last few throws'
-times)?
+**Verdict:** never given directly. Treated as accepted (Claude's
+reading): on 2026-11-17 Mike asked for the weight bar's guidelines to
+be removed "so you have to use the short split time to judge". The
+previous stone's H-H (PRV) was added with living ice.
 
-**Verdict:** _pending_
-
-### EXP-04: Curl physics fix + near house + slide-out delivery (ACTIVE)
+### EXP-04: Curl physics fix + near house + slide-out delivery (closed)
 
 **Bug (Mike):** heavy hits appeared to curl the wrong way; "a super
 heavy hit would just go dead straight." Investigation: the model never
@@ -217,9 +254,11 @@ as on the ice). Calling the right amount of ice is the player's skill
 now, like real curling: draw = aim ~4ft wide, let it come home. No
 curl preview anywhere.
 
-**Verdict:** _pending (test with EXP-03 stopwatch)_
+**Verdict:** no direct verdict; no complaints about curl direction or
+aiming reference since the broom-line change, so treated as settled
+(Claude's reading).
 
-### EXP-05: Skip cam + 14s ice (ACTIVE)
+### EXP-05: Skip cam + 14s ice (closed: locked in)
 
 **Feedback (Mike):** aiming too hard — minimap too small to place the
 broom precisely. And draw-to-button was reading 13.2 H-H; should
@@ -242,7 +281,7 @@ base mostly 14.0, occasionally 13.5 or 15.0; with ice evolution, often
 **Verdict (2026-06-13):** aiming "way better" — skip cam locked in.
 New issue → EXP-06.
 
-### EXP-06: Stop-position weight meter (ACTIVE)
+### EXP-06: Stop-position weight meter (closed: scaling kept, was too easy)
 
 **Feedback (Mike):** weight control too hard, draw area of the bar
 really small. Root cause: bar was linear in velocity but stop distance
@@ -270,12 +309,83 @@ The stopwatch split is the only readout of what you threw.
 
 **Verdict:** _pending_
 
+### EXP-08: Throw lab — one-pass hold-to-throw (ACTIVE)
+
+**Idea (Mike, 2026-11-17):** make shooting harder. Press Space when the
+line is where you want it; that starts the meter, which runs until you
+let go. It does not go up and down, so you get one quick try.
+
+This is the EXP-02 mechanic that was "too hard" in June. What changed
+since: the bar is linear in stop position (the button window is ~5x
+wider than it was then), aiming has the skip cam, and weight in TAP
+mode is now "a bit too easy". Worth another look.
+
+**Lab:** keys **1-3**, live, remembered; mode shows bottom-left.
+
+| # | Mode | Aim | Weight |
+|---|------|-----|--------|
+| 1 | TAP | tap to lock | bar oscillates (1.15s cycle), tap to set |
+| 2 | HOLD | press to lock | bar climbs once while held, 0.8s to the top; release throws; tops out = full weight |
+| 3 | HOLD FAST | press to lock | same, 0.575s to the top (the TAP bar's sweep speed) |
+
+In HOLD a draw is a ~0.44s hold and a metre of ice is ~54ms; in HOLD
+FAST ~0.32s and ~39ms.
+
+**Ask:** which mode, and is the climb speed right?
+
+**Verdict:** _pending_
+
+### EXP-09: Living ice, first cut (ACTIVE)
+
+**Spec (Mike):** mostly consistent but not perfect across the sheet;
+changes during the game; every game a little different; base mostly
+14.0 hog-to-hog, occasionally 13.5 or 15.0; often 13.0-13.5 on the
+first few rocks, then it speeds up.
+
+**Build** (`makeLivingIce(seed)`, one sheet per game):
+- **Between games:** base speed 60% ~14.0, 20% ~13.5, 20% ~15.0 (each
+  ±0.15); draw curl ~4.0-6.0 ft, more on quicker sheets; one side of
+  the sheet swings more than the other; keen and heavy patches (±3.5%)
+  from a seeded noise field.
+- **During a game:** fresh pebble starts 0.6-0.9s slow and keens up
+  over the first handful of stones (a 14.0 sheet reads about 13.3,
+  13.75, 14.0 on stones 1, 4, 13). After 40-55 stones the pebble
+  breaks down: up to 0.6s slower and 25% straighter.
+- **Where you throw:** the outside edges are frosty (up to 7% heavier);
+  every stone polishes its lane, which gets up to 4.5% quicker and 12%
+  straighter after about ten passes.
+- **ICE REPORT** card before the game: speed and curl rounded to the
+  nearest half, and a note that the pebble is fresh. Nothing about the
+  patches, the swingy side or how slow "fresh" is.
+- **Stopwatch** now also shows the previous stone's hog-to-hog (PRV).
+- **Menu:** ICE: LIVING (default) or PERFECT (uniform nominal ice, no
+  report) for comparison.
+- The CPU learns the sheet from the report plus watching stones (see
+  Architecture).
+
+**Ask:** play a full game on LIVING. Can you feel the fresh pebble and
+the keen-up through the splits? Are the magnitudes right, too subtle,
+or too much? Does the CPU feel fair?
+
+**Verdict:** _pending_
+
 ## Locked-in values
 
-- Feel profile: **CLASSIC** (default, EXP-01). Lab keys 1-4 kept for
-  future reference.
-- Throw flow: **handle → aim (tap) → oscillating weight meter (tap)**
-  (EXP-02 final).
+- **Feel (EXP-01):** playback 2.4x, aim arrow 2.0 rad/s over ±4.2°,
+  sweep +0.34 per press, -1.1/s decay.
+- **Throw order (EXP-02):** handle, then aim, then weight.
+- **Aiming (EXP-04/05):** broom line only, no curl preview anywhere;
+  skip cam while aiming; the delivery line stays on the ice during the
+  throw; handles labelled CCW/CW with the curl direction spelled out.
+- **Timing (EXP-03/04/05):** stopwatch in sim seconds; SPL is back line
+  to near hog, H-H is hog to hog; release just before the near hog.
+- **Nominal ice (EXP-05):** 0.080 m/s² = 14.0s hog-to-hog and a 3.77s
+  split on a draw to the button; 4.8 ft of draw curl.
+- **Curl model (EXP-04):** zero above 2.1 m/s, full below 1.7; peels
+  run exactly straight.
+- **Weight bar (EXP-06/07):** linear in stop position on nominal ice
+  (hog-to-back-line zone is 56% of the bar, draw at 0.555); unmarked;
+  1.15s cycle in TAP mode.
 
 ## Raw feedback archive
 
@@ -284,3 +394,12 @@ The stopwatch split is the only readout of what you threw.
   hit the broom and to hit the weight and you have to judge that." Plus:
   choose turn before aiming; weight should be hold-release continuation
   of the aim press.
+- 2026-06-13: "Aiming is way better... weight control is really hard
+  because the draw area of the weight bar is really small."
+- 2026-11-17 (EXP-06): "weight control is just a bit too easy. speed it
+  up a tiny bit. and there should be fewer guidelines in the meter...
+  Maybe no guidelines at all."
+- 2026-11-17: "do all the things on your roadmap. After we get the
+  feeling of ice and 'living' ice down then we can turn this into a
+  Mike Tyson's punchout style story." Plus the one-pass hold-to-throw
+  idea (EXP-08).

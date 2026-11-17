@@ -11,9 +11,9 @@ with a 5×5 pixel font and Web Audio chiptune bleeps.
 
 Underneath the pixels the stones obey real curling physics.
 
-| | | |
-|---|---|---|
-| ![title](shots/1-title.png) | ![aiming with the skip cam](shots/5-aim.png) | ![sweeping](shots/7-sweep.png) |
+| | | | |
+|---|---|---|---|
+| ![title](shots/1-title.png) | ![ice report](shots/3-ice-report.png) | ![aiming with the skip cam](shots/5-aim.png) | ![sweeping](shots/7-sweep.png) |
 
 ## Play it
 
@@ -34,23 +34,50 @@ Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
 
 | Phase  | What happens | Controls |
 |--------|--------------|----------|
-| HANDLE | Commit to the curl direction first (in-turn / out-turn) | `←` / `→`, then `SPACE` |
+| HANDLE | Commit to the turn first: counter-clockwise curls left, clockwise curls right | `←` / `→`, then `SPACE` |
 | AIM    | The arrow oscillates left/right | `SPACE` to lock it |
 | WEIGHT | The power meter oscillates — unmarked, so you learn your weights from the split times | `SPACE` to lock |
 | SWEEP  | Stone is away! Sweeping carries it farther and straighter | mash `SPACE` (or `Z`/`X`) |
 
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or
-2-player hot seat, stones per team per end (2/4/8), and number of ends.
+2-player hot seat, stones per team per end (2/4/8), number of ends, and
+the ice: LIVING or PERFECT.
+
+**Throw lab:** keys `1`-`3` switch how a throw is made, live. `1` TAP
+is the table above. `2` HOLD and `3` HOLD FAST make it one motion:
+pressing `SPACE` locks the aim and starts the weight bar, which climbs
+once while you hold; letting go throws.
+
+## Living ice
+
+On LIVING ice every game is played on a different sheet, and the sheet
+changes as you play:
+
+- The **ice report** before the game gives the icemaker's rounded
+  figures for speed and curl. Most sheets run about 14.0 seconds
+  hog-to-hog; some run about 13.5 or 15.0.
+- The pebble is **fresh**: the first stones run 0.6-0.9 seconds slower
+  than the report, and the sheet keens up over the next handful. In a
+  long game it eventually breaks down, slower and straighter.
+- It is **not uniform**: there are keen and heavy patches, the outside
+  edges are frosty, one side swings more than the other, and the lane
+  stones keep travelling gets quicker and straighter.
+- The weight bar never changes: the same position is always the same
+  throw. Read the sheet off the stopwatch, which also shows the
+  previous stone's hog-to-hog (PRV), and adjust.
+
+The CPU skip gets the same report and has to learn the sheet by
+watching stones, like you. PERFECT ice is the uniform nominal sheet.
 
 The minimap on the right shows the whole sheet, every stone, and your
 **broom line** while you aim — a straight line, like a skip's broom. The
-stone curls off that line (~4 ft on a draw), so call your ice: aim a
+stone curls off that line (4-6 ft on a draw), so call your ice: aim a
 few feet wide of the button and let the handle bring it home.
 
 While a stone runs, the **stopwatch** (top-left) shows the split (SPL,
-release to near hog) and hog-to-hog (H-H) in *real curling seconds* —
+back line to near hog) and hog-to-hog (H-H) in *real curling seconds* —
 the clock runs on simulation time, so the numbers stay canonical no
-matter how fast the game plays back. Draws run ~13-14s hog-to-hog,
+matter how fast the game plays back. Draws run ~13-15s hog-to-hog,
 takeouts ~7-9s, just like on real ice.
 
 ## The physics
@@ -82,11 +109,13 @@ No build step and no dependencies; the game is two plain scripts.
   collisions, offline shot simulation and the weight scale. Pure (no
   DOM), so tests load it directly. Ice is an object with `decelAt(y, z)`
   and `curlAt(y, z)`; everything asks the ice rather than reading a
-  constant.
+  constant. `makeIce()` is the nominal sheet, `makeLivingIce(seed)` a
+  generated one.
 - `game.js` — state machine, input, CPU skip, rendering, sound
 - `test/` — `npm test` runs the physics calibration tests (hog-to-hog
   and split times, curl, straight peels, collisions, frame-rate
-  independence) and a full seeded game against the CPU
+  independence, living-ice behaviour) and seeded full games against
+  the CPU
 - `tools/shots.js` — `npm run shots` regenerates `shots/` in headless
   Chromium (needs playwright)
 - `NOTES.md` — design log: playtest verdicts, locked-in values, backlog
