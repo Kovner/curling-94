@@ -216,3 +216,16 @@ test('speed and curl conversions agree with the simulation', () => {
     near(r.z / FT, 5, 0.35, `simulated curl on ${hth} ice`);
   }
 });
+
+test('ice read: hog-to-hog seconds for a line, independent of any throw', () => {
+  near(P.iceSpeedOnLine(ice, 0), P.hthForDecel(P.ICE_DECEL), 1e-9, 'uniform ice, centre');
+  near(P.iceSpeedOnLine(ice, 0.05), P.hthForDecel(P.ICE_DECEL), 1e-9, 'uniform ice, any line');
+  const sheet = P.makeLivingIce(8);
+  const fresh = P.iceSpeedOnLine(sheet, 0);
+  near(fresh, drawOn(sheet).hth, 0.15, 'matches what a draw down that line would time');
+  const lopsided = { decelAt: (y, z) => (z > 0 ? 0.09 : 0.075), curlAt: () => P.ICE_CURL };
+  near(P.iceSpeedOnLine(lopsided, 0.03), P.hthForDecel(0.09), 1e-9, 'a line into the heavy side');
+  near(P.iceSpeedOnLine(lopsided, -0.03), P.hthForDecel(0.075), 1e-9, 'a line into the keen side');
+  for (let i = 0; i < 12; i++) sheet.stoneThrown();
+  assert.ok(P.iceSpeedOnLine(sheet, 0) - fresh > 0.5, 'reads quicker once the pebble has keened up');
+});

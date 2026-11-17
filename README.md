@@ -30,23 +30,18 @@ python3 -m http.server 8000
 sheet; closest to the button scores. Most points after the final end wins
 (ties go to an extra end).
 
-Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
+Each throw is a field-goal routine, then a mash-to-sweep ride:
 
 | Phase  | What happens | Controls |
 |--------|--------------|----------|
 | HANDLE | Commit to the turn first: counter-clockwise curls left, clockwise curls right | `←` / `→`, then `SPACE` |
-| AIM    | The arrow oscillates left/right | `SPACE` to lock it |
-| WEIGHT | The power meter oscillates — unmarked, so you learn your weights from the split times | `SPACE` to lock |
+| AIM    | The broom swings left and right | press and **hold** `SPACE` to lock it |
+| WEIGHT | The unmarked weight bar climbs once while you hold | **let go** to throw (holding to the top throws full weight) |
 | SWEEP  | Stone is away! Sweeping carries it farther and straighter | mash `SPACE` (or `Z`/`X`) |
 
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or
 2-player hot seat, stones per team per end (2/4/8), number of ends, and
 the ice: LIVING or PERFECT.
-
-**Throw lab:** keys `1`-`3` switch how a throw is made, live. `1` TAP
-is the table above. `2` HOLD and `3` HOLD FAST make it one motion:
-pressing `SPACE` locks the aim and starts the weight bar, which climbs
-once while you hold; letting go throws.
 
 ## Living ice
 
@@ -63,12 +58,23 @@ changes as you play:
   edges are frosty, one side swings more than the other, and the lane
   stones keep travelling gets quicker and straighter.
 - The weight bar never changes: the same position is always the same
-  throw. Read the sheet off the stopwatch, which also shows the
-  previous stone's hog-to-hog (PRV), and adjust.
+  throw. Read the sheet and adjust.
+
+Two things show you what the ice is doing. After every stone the
+stopwatch adds an **ICE** read: what that line is running at, in
+hog-to-hog seconds for a draw to the button, whatever weight you threw.
+And after each end the **ice log** charts every read so far against the
+icemaker's report.
+
+For testing the model there is an **ice lab**: `I` overlays the truth
+on the sheet (speed map, then curl map, then off), and with it on `]`
+ages the pebble by one stone without throwing.
 
 The CPU skip gets the same report and has to learn the sheet by
 watching stones, like you. PERFECT ice is the uniform nominal sheet.
 
+While you aim, the **skip cam** shows the far end close up, stretching
+down the sheet to include any guards, with your broom line through it.
 The minimap on the right shows the whole sheet, every stone, and your
 **broom line** while you aim — a straight line, like a skip's broom. The
 stone curls off that line (4-6 ft on a draw), so call your ice: aim a

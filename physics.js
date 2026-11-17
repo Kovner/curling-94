@@ -242,6 +242,20 @@ function hthForDecel(a) { return Math.sqrt(2 / a) * HTH_K; }
 // (4.8 ft on nominal ice; slower ice gives the stone less time to curl).
 function curlForFeet(feet, a) { return ICE_CURL * (feet / 4.8) * (a / ICE_DECEL) * (a / ICE_DECEL); }
 
+// What a skip would say the ice is running at down one aim line: the
+// hog-to-hog seconds of a draw to the button on ice as fast as that line's
+// average from release to the tee. Unlike a stone's own hog-to-hog time it
+// does not depend on how hard anything was thrown.
+function iceSpeedOnLine(ice, ang) {
+  const slope = Math.tan(ang || 0), n = Math.ceil((TEE - RELEASE_Y) / 0.25), ds = (TEE - RELEASE_Y) / n;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const y = RELEASE_Y + (i + 0.5) * ds;
+    sum += ice.decelAt(y, slope * (y - SLIDE_START));
+  }
+  return hthForDecel(sum / n);
+}
+
 const NOISE_NY = 8, NOISE_NZ = 4;            // coarse patches: ~6m long, ~1.6m wide
 const WEAR_NY = 42, WEAR_NZ = 20;            // traffic grid: 1m x 0.25m cells
 function noiseGrid(rng) {
@@ -316,6 +330,8 @@ function makeLivingIce(seed) {
       }
     },
     wearAt,
+    // the sheet-wide speed and curl right now, before patches, edges and wear
+    baseNow() { return { decel: decelNow, curl: curlNow }; },
     stoneThrown() { thrown++; refresh(); },
     // What the icemaker tells both teams before the game: rounded, and
     // silent about the fresh pebble, the patches and the swingy side.
@@ -347,7 +363,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SHEET_HALF, WALL_Z, SLIDE_START, NBACK, NTEE, RELEASE_Y, NHOG, FHOG, TEE, BACK, WLEN,
     HOUSE_R, R, V_STOP, RESTITUTION, SWEEP_FRICTION, SWEEP_CURL, SPIN_RATE,
-    ICE_DECEL, ICE_CURL, makeIce, makeLivingIce, decelForHth, hthForDecel, curlForFeet, curlGate, isMoving, stepStone, stepWorld,
+    ICE_DECEL, ICE_CURL, makeIce, makeLivingIce, decelForHth, hthForDecel, curlForFeet, iceSpeedOnLine, curlGate, isMoving, stepStone, stepWorld,
     simulateStone, releasedStone, simulateShot, solveAim, speedToStopAt, coastDistance,
     V_MIN, V_MAX, P_HOG, P_BACKX, V_HOG, V_BACK, vOfPower, powerOfV, makeRng,
   };

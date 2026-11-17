@@ -37,35 +37,53 @@ const outDir = path.join(root, 'shots');
   await key('Enter'); await waitState('icereport'); await page.waitForTimeout(600);
   await shot('3-ice-report');
   await key('Space'); await waitState('prethrow'); await page.waitForTimeout(400);
+
+  // put a guard and a house stone out there so the aiming screens show them
+  await game(() => {
+    const at = (team, y, z) => ({ team, y, z, vy: 0, vz: 0, spin: 1, rot: 0, alive: true, touched: false });
+    window.__C94.stones.push(at(1, 34.1, -0.35), at(1, 38.0, 0.45));
+  });
   await key('Space'); await waitState('curl'); await page.waitForTimeout(200);
   await shot('4-handle');
   await key('Space'); await waitState('aim'); await page.waitForTimeout(500);
   await shot('5-aim');
+
+  // the throw is one motion: press to lock the line, hold while the bar climbs, let go
   await waitFor(() => Math.abs(window.__C94.aimAng) < 0.006, 'the arrow to cross the centre line');
-  await key('Space'); await waitState('power');
-  await waitFor(() => window.__C94.power >= 0.62, 'a firm draw on the bar');
+  await page.keyboard.down('Space'); await waitState('power');
+  await waitFor(() => window.__C94.power >= 0.4, 'weight on the bar');
   await shot('6-weight');
-  await key('Space'); await waitState('slide');
+  await page.keyboard.up('Space'); await waitState('slide');
   await waitFor(() => window.__C94.watch.split !== null, 'the near hog line');
   for (let i = 0; i < 12; i++) { await key('Space'); await page.waitForTimeout(70); }
   await shot('7-sweep');
   await waitState('postthrow', 60000); await page.waitForTimeout(900);
   await shot('8-house');
 
-  // let the CPU throw, so the stopwatch shows the previous stone's time
-  await waitFor(() => window.__C94.cpuTurn && window.__C94.state === 'slide' && window.__C94.watch.split !== null, 'the CPU stone', 60000);
-  await page.waitForTimeout(500);
-  await shot('8b-cpu-stone');
+  // ICE LAB (the I key): the truth overlay, speed map then curl map, on the
+  // next aiming screen. Set directly so the on-screen flash is not in shot.
+  await waitFor(() => !window.__C94.cpuTurn && window.__C94.state === 'curl', 'the next handle choice', 90000);
+  await key('Space'); await waitState('aim'); await page.waitForTimeout(300);
+  await game(() => { window.__C94.iceLab = 1; }); await page.waitForTimeout(120);
+  await shot('8b-ice-lab-speed');
+  await game(() => { window.__C94.iceLab = 2; }); await page.waitForTimeout(120);
+  await shot('8c-ice-lab-curl');
+  await game(() => { window.__C94.iceLab = 0; });
 
-  // play out the end with quick throws to reach the scoreboard
+  // play out the end with quick throws to reach the scoreboard and the ice log
   for (let guard = 0; guard < 6000; guard++) {
     const s = await state();
     if (s === 'endscore' || s === 'gameover') break;
-    if (!(await game(() => window.__C94.cpuTurn)) && s !== 'deliver' && s !== 'postthrow') await key('Space');
+    const cpu = await game(() => window.__C94.cpuTurn);
+    if (!cpu && s === 'aim') {
+      await page.keyboard.down('Space'); await page.waitForTimeout(330); await page.keyboard.up('Space');
+    } else if (!cpu && (s === 'prethrow' || s === 'curl' || s === 'slide')) await key('Space');
     await page.waitForTimeout(90);
   }
   await page.waitForTimeout(400);
   await shot('9-endscore');
+  await key('Space'); await waitState('icelog'); await page.waitForTimeout(500);
+  await shot('9b-ice-log');
 
   await browser.close();
   if (errors.length) { console.error('page errors:', errors); process.exit(1); }

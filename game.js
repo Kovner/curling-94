@@ -273,25 +273,10 @@ const TUNE = {
   ts: 2.4,            // playback speed: sim seconds per real second
   aimSpeed: 2.0,      // aim arrow oscillation, rad/s
   aimRange: 4.2,      // aim arrow swing, degrees either side
-  powerPeriod: 1.15,  // weight bar: seconds for a full up-and-down cycle
+  weightRise: 0.575,  // weight bar: seconds to climb from empty to full
   sweepAdd: 0.34,     // sweep gained per key press
   sweepDecay: 1.1,    // sweep lost per second
 };
-
-// ---- LAB: variants of the experiment currently under playtest (NOTES.md).
-// EXP-08, how a throw is made. Keys 1-3 switch live; the choice is remembered.
-const THROW_MODES = [
-  { name: 'TAP',       hold: false },             // tap locks aim; bar oscillates; tap sets weight
-  { name: 'HOLD',      hold: true, rise: 0.8 },   // press locks aim and starts the bar, release throws: one pass
-  { name: 'HOLD FAST', hold: true, rise: 0.575 }, // same, at the TAP bar's sweep speed
-];
-let throwModeIdx = 0;
-try { throwModeIdx = Math.min(THROW_MODES.length - 1, Math.max(0, +localStorage.getItem('c94throw') || 0)); } catch (e) {}
-function setThrowMode(i) {
-  throwModeIdx = i;
-  try { localStorage.setItem('c94throw', i); } catch (e) {}
-}
-function throwMode() { return THROW_MODES[throwModeIdx]; }
 
 // All gameplay randomness (CPU decisions, taunts) comes from here, so a
 // game can be replayed from its seed.
@@ -307,7 +292,8 @@ const G = {
   end: 1, hammer: 1, scores: [0, 0],
   ice: makeIce(),                     // the sheet being played on
   cpuIce: { decel: ICE_DECEL, curl: ICE_CURL }, // what the CPU skip believes the ice is doing
-  lastHth: null,                      // previous stone's hog-to-hog, for comparison
+  iceLog: [],                         // one ice read per stone thrown this game
+  iceLab: 0,                          // testing overlay: 0 off, 1 speed map, 2 curl map
   throwIdx: 0, stones: [], active: null,
   team: 0, cpuTurn: false, cpu: null,
   aimAng: 0, spin: 1, power: 0, vRelease: 0, deliverY: SLIDE_START,
@@ -368,7 +354,7 @@ function evalEnd() {
 function resetGame() {
   G.scores = [0, 0]; G.end = 1; G.hammer = 1; G.extraEnd = false;
   G.gameWinner = -1;
-  G.lastHth = null;
+  G.iceLog = [];
   if (G.livingIce) {
     G.ice = makeLivingIce(Math.floor(rand() * 0x100000000));
     // the CPU starts from the same icemaker's report the player is shown
@@ -451,12 +437,16 @@ function cpuSweepLogic() {
 // ---------------------------------------------------------- update
 function update(dt) {
   G.t += dt; G.st += dt;
-  for (let i = 0; i < THROW_MODES.length; i++) {
-    if (tap('Digit' + (i + 1))) {
-      setThrowMode(i);
-      setFlash('THROW: ' + throwMode().name, '#f8d878', 1.0);
-      sfxMove();
-    }
+  // ICE LAB (testing aid): I cycles the truth overlay, ] ages the pebble
+  if (tap('KeyI') && G.ice.baseNow) {
+    G.iceLab = (G.iceLab + 1) % 3;
+    setFlash(['ICE LAB OFF', 'ICE LAB: SPEED MAP', 'ICE LAB: CURL MAP'][G.iceLab], '#f8d878', 1.0);
+    sfxMove();
+  }
+  if (G.iceLab && tap('BracketRight') && G.ice.stoneThrown) {
+    G.ice.stoneThrown(); cpuWatchIce();
+    setFlash('PEBBLE AGED: STONE ' + (G.ice.stonesThrown + 1), '#f8d878', 0.8);
+    sfxMove();
   }
   if (G.flash) { G.flash.t -= dt; if (G.flash.t <= 0) G.flash = null; }
   // camera easing
@@ -515,25 +505,22 @@ function update(dt) {
         if (G.st > 1.1) { G.aimAng = G.cpu.ang; G.power = 0; sfxLock(); setState('power'); }
       } else {
         G.aimAng = Math.sin(G.st * TUNE.aimSpeed) * (TUNE.aimRange * Math.PI / 180);
+        // pressing locks the line and starts the weight bar in one motion
         if (tap('Space') || tap('Enter')) { G.power = 0; sfxLock(); setState('power'); }
       }
       break;
     }
     case 'power': {
+      // one pass: the bar climbs while the key that locked the aim stays
+      // down, and the stone goes when it is let go (or the bar tops out)
       if (G.cpuTurn) {
-        G.power = Math.min(G.cpu.p, G.st / TUNE.powerPeriod);
+        G.power = Math.min(G.cpu.p, G.st / TUNE.weightRise);
         if (G.power >= G.cpu.p) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
-      } else if (throwMode().hold) {
-        // one pass: the bar climbs while the key that locked the aim stays
-        // down, and the stone goes when it is let go (or the bar tops out)
-        G.power = Math.min(1, G.st / throwMode().rise);
+      } else {
+        G.power = Math.min(1, G.st / TUNE.weightRise);
         if (G.power >= 1 || (!keys['Space'] && !keys['Enter'])) {
           G.vRelease = vOfPower(G.power); sfxLock(); startDelivery();
         }
-      } else {
-        const ph = (G.st / TUNE.powerPeriod) % 1;
-        G.power = ph < 0.5 ? ph * 2 : 2 - ph * 2;
-        if (tap('Space') || tap('Enter')) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
       }
       break;
     }
@@ -608,16 +595,12 @@ function update(dt) {
     }
     case 'endscore': {
       if (G.st > 3.2 || tap('Enter') || tap('Space')) {
-        const last = G.end >= G.endsTotal;
-        if (last && G.scores[0] !== G.scores[1]) {
-          G.gameWinner = G.scores[0] > G.scores[1] ? 0 : 1;
-          sfxCheer(); jingle(G.gameWinner === 0);
-          setState('gameover');
-        } else {
-          if (last) { G.extraEnd = true; setFlash('EXTRA END!!', '#f8d878', 1.6); }
-          G.end++; startEnd();
-        }
+        if (G.livingIce) setState('icelog'); else afterEnd();
       }
+      break;
+    }
+    case 'icelog': {
+      if (G.st > 0.5 && (tap('Enter') || tap('Space'))) { sfxMove(); afterEnd(); }
       break;
     }
     case 'gameover': {
@@ -627,6 +610,18 @@ function update(dt) {
     }
   }
   for (const k in pressed) pressed[k] = 0;
+}
+
+function afterEnd() {
+  const last = G.end >= G.endsTotal;
+  if (last && G.scores[0] !== G.scores[1]) {
+    G.gameWinner = G.scores[0] > G.scores[1] ? 0 : 1;
+    sfxCheer(); jingle(G.gameWinner === 0);
+    setState('gameover');
+  } else {
+    if (last) { G.extraEnd = true; setFlash('EXTRA END!!', '#f8d878', 1.6); }
+    G.end++; startEnd();
+  }
 }
 
 function startDelivery() { G.deliverY = SLIDE_START; setState('deliver'); }
@@ -644,7 +639,12 @@ function finishThrow() {
     else if (s.y > FHOG && s.y < TEE - HOUSE_R) setFlash('GUARD UP!', '#3cbcfc', 1.2);
   }
   G.sweep = 0;
-  if (G.watch.hth !== null) G.lastHth = G.watch.hth;
+  // the skip's read of the ice this stone ran on, taken before it ages
+  G.iceLog.push({
+    team: G.team, end: G.end,
+    line: iceSpeedOnLine(G.ice, G.aimAng),   // down the line it was thrown
+    sheet: iceSpeedOnLine(G.ice, 0),         // down the centre line
+  });
   if (G.ice.stoneThrown) G.ice.stoneThrown();
   cpuWatchIce();
   setState('postthrow');
@@ -792,42 +792,65 @@ function drawAimLine() {
   }
 }
 
-// Skip's-eye view: big house close-up shown while aiming, with the broom
-// marker sweeping across it — you call the shot from the house like a skip.
+// Skip's-eye view, shown while aiming: a close-up of the far end with the
+// broom line running through it, so you call the shot from the house like
+// a skip. It covers the house, and stretches down the sheet as far as the
+// far hog line to take in any stones sitting in front of it.
+const SKIP_KX = 22, SKIP_KY = 14;   // panel pixels per metre
+function skipViewWindow() {
+  const top = BACK + 0.65;
+  let bottom = TEE - HOUSE_R - 0.3;
+  for (const s of G.stones) if (s.alive && s.y - 0.6 < bottom) bottom = s.y - 0.6;
+  return { top, bottom: Math.max(FHOG - 0.4, bottom) };
+}
 function drawSkipView() {
-  const pw = 112, ph = 76, x0 = ((W - pw) / 2) | 0, y0 = 26;
-  const KX = pw / (SHEET_HALF * 2 + 0.3), KY = 14;
-  const cx = x0 + pw / 2, cy = y0 + 47; // tee line row
+  const { top, bottom } = skipViewWindow();
+  const pw = 112, ph = Math.round((top - bottom) * SKIP_KY), x0 = ((W - pw) / 2) | 0, y0 = 26;
+  const cx = x0 + pw / 2, yOf = wy => (y0 + (top - wy) * SKIP_KY) | 0, cy = yOf(TEE);
   px(x0 - 1, y0 - 1, pw + 2, ph + 2, '#fcfcfc');
   px(x0, y0, pw, ph, '#dcecf4');
-  // back line, rings, lines
-  px(x0, (cy - (BACK - TEE) * KY) | 0, pw, 1, '#181818');
-  fillEllipse(cx, cy, (HOUSE_R * KX) | 0, (HOUSE_R * KY) | 0, '#3cbcfc');
-  fillEllipse(cx, cy, (1.22 * KX) | 0, (1.22 * KY) | 0, '#fcfcfc');
-  fillEllipse(cx, cy, (0.61 * KX) | 0, (0.61 * KY) | 0, '#d82800');
-  fillEllipse(cx, cy, (0.15 * KX) | 0, (0.15 * KY) | 0, '#fcfcfc');
+  drawText('SKIP CAM', x0 + 2, y0 + 2, '#00287c');
+  // back line, rings, tee line, centre line, far hog line if it is in view
+  px(x0, yOf(BACK), pw, 1, '#181818');
+  fillEllipse(cx, cy, (HOUSE_R * SKIP_KX) | 0, (HOUSE_R * SKIP_KY) | 0, '#3cbcfc');
+  fillEllipse(cx, cy, (1.22 * SKIP_KX) | 0, (1.22 * SKIP_KY) | 0, '#fcfcfc');
+  fillEllipse(cx, cy, (0.61 * SKIP_KX) | 0, (0.61 * SKIP_KY) | 0, '#d82800');
+  fillEllipse(cx, cy, (0.15 * SKIP_KX) | 0, (0.15 * SKIP_KY) | 0, '#fcfcfc');
   px(x0, cy, pw, 1, '#607080');
   px(cx, y0, 1, ph, '#a8c4d4');
-  // stones in/near the house
+  if (FHOG > bottom) px(x0, yOf(FHOG), pw, 2, '#d82800');
+  if (G.iceLab && G.ice.baseNow) {
+    for (let wy = Math.ceil(bottom * 2) / 2; wy < BACK; wy += 0.5) {
+      for (let z = -SHEET_HALF; z < SHEET_HALF - 0.01; z += 0.25) {
+        const tint = iceTint(wy + 0.25, z + 0.125);
+        if (!tint) continue;
+        ctx.fillStyle = tint;
+        const sx = Math.round(cx + z * SKIP_KX), sy = yOf(wy + 0.5);
+        ctx.fillRect(sx, sy, Math.round(cx + (z + 0.25) * SKIP_KX) - sx, yOf(wy) - sy);
+      }
+    }
+  }
+  // every stone in view
   for (const s of G.stones) {
-    if (!s.alive) continue;
-    const dy = s.y - TEE;
-    if (Math.abs(dy) > 3.1 || Math.abs(s.z) > 2.3) continue;
-    const sx = cx + s.z * KX, sy = cy - dy * KY;
+    if (!s.alive || s.y < bottom + 0.2 || s.y > top - 0.2 || Math.abs(s.z) > 2.3) continue;
+    const sx = cx + s.z * SKIP_KX, sy = yOf(s.y);
     fillEllipse(sx, sy, 4, 3, '#7c7c7c');
     fillEllipse(sx, sy - 1, 3, 2, TEAMS[s.team].c1);
   }
-  // broom line + broom at the tee crossing
-  const bz = Math.sin(G.aimAng) * (TEE - SLIDE_START);
-  const bx = (cx + bz * KX) | 0;
-  if (bx > x0 + 1 && bx < x0 + pw - 2) {
-    ctx.fillStyle = '#f8d878';
-    for (let yy = y0 + 2; yy < y0 + ph - 2; yy += 4) ctx.fillRect(bx, yy, 1, 2);
+  // the broom line as it really runs (it is angled, so it is not at the
+  // same place beside a guard as it is at the tee), and the broom itself
+  const slope = Math.tan(G.aimAng);
+  ctx.fillStyle = '#f8d878';
+  for (let yy = y0 + 2; yy < y0 + ph - 2; yy += 4) {
+    const lx = (cx + slope * (top - (yy - y0) / SKIP_KY - SLIDE_START) * SKIP_KX) | 0;
+    if (lx > x0 + 1 && lx < x0 + pw - 2) ctx.fillRect(lx, yy, 1, 2);
+  }
+  const bx = (cx + slope * (TEE - SLIDE_START) * SKIP_KX) | 0;
+  if (bx > x0 + 2 && bx < x0 + pw - 3) {
     px(bx, cy - 9, 1, 8, '#c89858');
     px(bx - 2, cy - 2, 5, 3, '#d82800');
     px(bx - 2, cy + 1, 5, 1, '#f8d878');
   }
-  drawText('SKIP CAM', x0 + 2, y0 + ph - 7, '#00287c');
 }
 
 function drawHud() {
@@ -971,7 +994,6 @@ function drawTitle() {
   px(W / 2 - 2, 166, 4, 5, '#881400');
   drawTextSh('HURRY HARD EDITION', W / 2, 206, '#f8d878', '#000000', 1, 'center');
   drawText('(C) 1994 GRANITE GAMES', W / 2, 224, '#9cc4dc', 1, 'center');
-  drawText('THROW LAB: KEYS 1-3', W / 2, 214, '#3cbcfc', 1, 'center');
 }
 function drawMenu() {
   stripes('#881400', '#d82800', 25);
@@ -1034,6 +1056,7 @@ function drawPrethrow() {
 function drawStones() { for (const s of G.stones) if (s.alive) drawStone(s); }
 function drawGame() {
   drawRink();
+  if (G.iceLab && G.ice.baseNow) drawIceMap();
   if (['deliver', 'slide'].includes(G.state)) drawAimLine();
   drawStones();
   if (['aim', 'curl', 'power'].includes(G.state)) {
@@ -1057,26 +1080,27 @@ function drawGame() {
   drawSweepGauge();
   drawStopwatch();
   if (G.state === 'aim' && !G.cpuTurn)
-    drawText(throwMode().hold ? 'HOLD SPACE: AIM + WEIGHT' : 'SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
+    drawText('PRESS AND HOLD SPACE', W / 2, 228, '#fcfcfc', 1, 'center');
   if (G.state === 'curl') {
-    px(W / 2 - 58, 148, 116, 40, '#00287c');
-    px(W / 2 - 58, 148, 116, 1, '#fcfcfc'); px(W / 2 - 58, 187, 116, 1, '#fcfcfc');
-    drawText('CHOOSE HANDLE', W / 2, 152, '#f8d878', 1, 'center');
-    drawText('< CCW', W / 2 - 52, 163, G.spin === -1 ? '#f8d878' : '#9cc4dc');
-    drawText('CW >', W / 2 + 52, 163, G.spin === 1 ? '#f8d878' : '#9cc4dc', 1, 'right');
-    drawText(G.spin === 1 ? '>>' : '<<', W / 2, 163, '#fcfcfc', 1, 'center');
-    drawText(G.spin === 1 ? 'CURLS RIGHT' : 'CURLS LEFT', W / 2, 175, '#fcfcfc', 1, 'center');
+    px(W / 2 - 58, 158, 116, 40, '#00287c');
+    px(W / 2 - 58, 158, 116, 1, '#fcfcfc'); px(W / 2 - 58, 197, 116, 1, '#fcfcfc');
+    drawText('CHOOSE HANDLE', W / 2, 162, '#f8d878', 1, 'center');
+    drawText('< CCW', W / 2 - 52, 173, G.spin === -1 ? '#f8d878' : '#9cc4dc');
+    drawText('CW >', W / 2 + 52, 173, G.spin === 1 ? '#f8d878' : '#9cc4dc', 1, 'right');
+    drawText(G.spin === 1 ? '>>' : '<<', W / 2, 173, '#fcfcfc', 1, 'center');
+    drawText(G.spin === 1 ? 'CURLS RIGHT' : 'CURLS LEFT', W / 2, 185, '#fcfcfc', 1, 'center');
   }
   if (G.state === 'power' && !G.cpuTurn && Math.floor(G.t * 6) % 2)
-    drawText(throwMode().hold ? 'LET GO TO THROW!' : 'SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
-  drawLabChip();
+    drawText('LET GO TO THROW!', W / 2, 228, '#f8d878', 1, 'center');
+  drawIceLabInfo();
   drawFlash();
 }
 function drawStopwatch() {
   if (!G.watch || !['deliver', 'slide', 'postthrow'].includes(G.state)) return;
   const w = G.watch;
   if (w.split === null && w.run === 0) return;
-  const x = 4, y = 26, h = G.lastHth === null ? 30 : 39;
+  const read = G.iceLog.length ? G.iceLog[G.iceLog.length - 1].line : null;
+  const x = 4, y = 26, h = read === null ? 30 : 39;
   px(x, y, 58, h, '#00287c');
   px(x, y, 58, 1, '#fcfcfc'); px(x, y + h - 1, 58, 1, '#fcfcfc');
   const fmt = t => t === null ? '--.-' : t.toFixed(1);
@@ -1085,14 +1109,90 @@ function drawStopwatch() {
   let hh = w.hth;
   if (hh === null && w.hogT !== null && G.state === 'slide') hh = w.run - w.hogT;
   drawText('H-H ' + fmt(hh), x + 3, y + 13, w.hth === null ? '#9cc4dc' : '#f8d878');
-  if (G.lastHth !== null) drawText('PRV ' + fmt(G.lastHth), x + 3, y + 22, '#3cbcfc');
+  // the latest ice read: fresh (bright) once this stone has stopped
+  if (read !== null) drawText('ICE ' + fmt(read), x + 3, y + 22, G.state === 'postthrow' ? '#80d010' : '#3cbcfc');
   drawText('SEC', x + 3, y + h - 8, '#3cbcfc');
 }
-function drawLabChip() {
-  const label = (throwModeIdx + 1) + '.' + throwMode().name;
-  px(0, 226, textW(label, 1) + 6, 12, '#00287c');
-  drawText(label, 3, 229, '#f8d878');
+
+// ICE LAB overlay (testing aid): tints the sheet with the truth about the
+// ice. Speed map: red is heavier than the sheet average, blue is keener.
+// Curl map: orange swings more, purple swings less.
+function iceTint(y, z) {
+  const base = G.ice.baseNow();
+  const dev = G.iceLab === 1 ? G.ice.decelAt(y, z) / base.decel - 1 : G.ice.curlAt(y, z) / base.curl - 1;
+  const a = Math.min(0.7, Math.abs(dev) * (G.iceLab === 1 ? 9 : 4));
+  if (a < 0.04) return null;
+  const rgb = G.iceLab === 1 ? (dev > 0 ? '216,40,0' : '0,88,248') : (dev > 0 ? '248,120,0' : '120,40,200');
+  return `rgba(${rgb},${a.toFixed(2)})`;
 }
+function drawIceMap() {
+  for (let wy = Math.floor(G.cam * 2) / 2; wy < G.cam + VIEW_M + 0.5; wy += 0.5) {
+    if (wy < 0 || wy > WLEN) continue;
+    for (let z = -SHEET_HALF; z < SHEET_HALF - 0.01; z += 0.25) {
+      const tint = iceTint(wy + 0.25, z + 0.125);
+      if (!tint) continue;
+      ctx.fillStyle = tint;
+      const sx = sxOf(z), sy = syOf(wy + 0.5);
+      ctx.fillRect(sx, sy, sxOf(z + 0.25) - sx, syOf(wy) - sy);
+    }
+  }
+}
+function drawIceLabInfo() {
+  if (!G.iceLab || !G.ice.baseNow) return;
+  px(0, 196, 60, 28, '#181818');
+  drawText('ICE LAB', 3, 199, '#f8d878');
+  drawText('NOW ' + G.ice.hthNow().toFixed(2), 3, 207, '#fcfcfc');
+  drawText('BASE' + G.ice.baseHth.toFixed(2), 3, 215, '#9cc4dc');
+}
+
+// Between ends: every stone's ice read so far, against the icemaker's
+// report, so a changing sheet is something you can see.
+function drawIceLog() {
+  const log = G.iceLog, report = G.ice.report().hth;
+  stripes('#00287c', '#0058f8', 18);
+  px(12, 30, W - 24, 180, '#181818');
+  px(12, 30, W - 24, 3, '#3cbcfc'); px(12, 207, W - 24, 3, '#3cbcfc');
+  drawTextSh('ICE LOG', W / 2, 40, '#fcfcfc', '#0058f8', 3, 'center');
+  drawText('HOG TO HOG SECONDS, STONE BY STONE', W / 2, 62, '#9cc4dc', 1, 'center');
+  // chart frame
+  const cx0 = 52, cx1 = 236, cy0 = 76, cy1 = 150;
+  const vals = log.flatMap(e => [e.line, e.sheet]).concat(report);
+  const lo = Math.floor((Math.min(...vals) - 0.2) * 2) / 2, hi = Math.ceil((Math.max(...vals) + 0.2) * 2) / 2;
+  const yOf = t => Math.round(cy1 - (t - lo) / (hi - lo) * (cy1 - cy0));
+  const xOf = i => Math.round(cx0 + 6 + (log.length < 2 ? 0 : i / (log.length - 1)) * (cx1 - cx0 - 12));
+  px(cx0, cy0, cx1 - cx0, cy1 - cy0 + 1, '#00287c');
+  for (let t = lo; t <= hi + 1e-9; t += 0.5) {
+    px(cx0, yOf(t), cx1 - cx0, 1, '#0058f8');
+    drawText(t.toFixed(1), cx0 - 4, yOf(t) - 2, '#9cc4dc', 1, 'right');
+  }
+  // the report, dashed
+  for (let x = cx0; x < cx1; x += 6) px(x, yOf(report), 3, 1, '#f8d878');
+  // the sheet's centre-line speed as a line, each stone's own lane as a dot
+  for (let i = 1; i < log.length; i++) {
+    const xa = xOf(i - 1), xb = xOf(i), ya = yOf(log[i - 1].sheet), yb = yOf(log[i].sheet);
+    for (let x = xa; x <= xb; x++) px(x, Math.round(ya + (yb - ya) * (x - xa) / Math.max(1, xb - xa)), 1, 1, '#fcfcfc');
+  }
+  log.forEach((e, i) => {
+    if (i > 0 && e.end !== log[i - 1].end) px(Math.round((xOf(i) + xOf(i - 1)) / 2), cy0, 1, cy1 - cy0, '#3cbcfc');
+    px(xOf(i) - 1, yOf(e.line) - 1, 3, 3, TEAMS[e.team].c1 === '#d82800' ? '#f87858' : '#3cbcfc');
+  });
+  drawText('STONE 1', cx0, cy1 + 5, '#9cc4dc');
+  drawText('STONE ' + log.length, cx1, cy1 + 5, '#9cc4dc', 1, 'right');
+  // the story in words
+  const first = log[0].sheet, now = iceSpeedOnLine(G.ice, 0);
+  const endStart = (log.find(e => e.end === log[log.length - 1].end) || log[0]).sheet;
+  const trend = now - endStart > 0.15 ? 'KEENING UP' : now - endStart < -0.15 ? 'SLOWING DOWN' : 'HOLDING STEADY';
+  px(22, 170, 3, 1, '#f8d878'); px(28, 170, 3, 1, '#f8d878');
+  drawText('REPORT ' + report.toFixed(1), 36, 168, '#f8d878');
+  px(108, 170, 8, 1, '#fcfcfc');
+  drawText('CENTRE LINE', 120, 168, '#fcfcfc');
+  px(196, 169, 3, 3, '#f87858');
+  drawText('LANES', 202, 168, '#9cc4dc');
+  drawText('STARTED ' + first.toFixed(1) + '   NOW ' + now.toFixed(1), W / 2, 180, '#fcfcfc', 1, 'center');
+  drawTextSh(trend, W / 2, 189, '#80d010', '#000000', 1, 'center');
+  if (Math.floor(G.t * 3) % 2) drawText('SPACE TO CONTINUE', W / 2, 199, '#9cc4dc', 1, 'center');
+}
+
 function drawEndScore() {
   stripes('#00287c', '#0058f8', 20);
   px(12, 36, W - 24, 168, '#181818');
@@ -1131,6 +1231,7 @@ function draw() {
     case 'icereport': drawIceReport(); break;
     case 'prethrow': drawPrethrow(); break;
     case 'endscore': drawEndScore(); break;
+    case 'icelog': drawIceLog(); break;
     case 'gameover': drawGameOver(); break;
     default: drawGame(); break;
   }

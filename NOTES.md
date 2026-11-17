@@ -15,21 +15,19 @@ build doesn't show.
 
 ## Where things stand (2026-11-17)
 
-Waiting on Mike's playtest of three things, all live:
-
-1. **EXP-07** unmarked, faster weight bar — is weight now judged from
-   the split?
-2. **EXP-08** throw lab (keys 1-3) — TAP vs HOLD vs HOLD FAST.
-3. **EXP-09** living ice — does the sheet feel alive and readable?
+Waiting on Mike's playtest of **EXP-10**: with the ice read, the ice
+log and the ice lab, can he now see and judge how the sheet changes,
+and are the magnitudes and the pace of change right?
 
 ## Backlog (impact-on-fun order)
 
 1. ✅ Core throw feel — CLASSIC tuning (EXP-01), handle-first (EXP-02)
 2. ✅ Real curling timing — stopwatch in sim seconds (EXP-03), 14.0s ice
    and skip cam (EXP-05)
-3. 🔬 Weight input — stop-position bar (EXP-06), unmarked (EXP-07),
-   one-pass hold variant (EXP-08)
-4. 🔬 Living ice — EXP-09 is the first cut; tune from playtests
+3. ✅ Throw input — stop-position bar (EXP-06), unmarked (EXP-07), one
+   motion hold-to-throw (EXP-08)
+4. 🔬 Living ice — first cut (EXP-09), made visible and testable
+   (EXP-10); tune the model from what Mike sees
 5. **Sweeping** — input scheme (mash vs rhythm vs hold) and how much a
    sweep should rescue. Sweeping currently adds up to ~39% carry, which
    on living ice hides a 3m misread of fresh pebble. Next lab.
@@ -295,7 +293,7 @@ mapping so GRD/house/DRW/HIT are all big and honest.
 **Verdict (2026-11-17):** stop-position scaling works, but now "just a
 bit too easy" → EXP-07.
 
-### EXP-07: Unmarked, slightly faster weight meter (ACTIVE)
+### EXP-07: Unmarked, slightly faster weight meter (closed: unmarked bar kept)
 
 **Feedback (Mike):** speed the meter up a tiny bit, and remove the
 guidelines so weight has to be judged from the split time — "maybe no
@@ -307,9 +305,10 @@ stop-position scaling underneath is unchanged, so equal distances of
 ice are still equal slivers of bar — you just can't see where they are.
 The stopwatch split is the only readout of what you threw.
 
-**Verdict:** _pending_
+**Verdict:** no direct verdict. The unmarked bar stays; the oscillating
+cycle it sped up was replaced by the one-pass climb in EXP-08.
 
-### EXP-08: Throw lab — one-pass hold-to-throw (ACTIVE)
+### EXP-08: Throw lab — one-pass hold-to-throw (closed: HOLD FAST won)
 
 **Idea (Mike, 2026-11-17):** make shooting harder. Press Space when the
 line is where you want it; that starts the meter, which runs until you
@@ -333,9 +332,10 @@ FAST ~0.32s and ~39ms.
 
 **Ask:** which mode, and is the climb speed right?
 
-**Verdict:** _pending_
+**Verdict (2026-11-17):** "Model 3 is perfect." HOLD FAST is now the
+throw; TAP, HOLD and the lab keys are gone.
 
-### EXP-09: Living ice, first cut (ACTIVE)
+### EXP-09: Living ice, first cut (closed: led to EXP-10)
 
 **Spec (Mike):** mostly consistent but not perfect across the sheet;
 changes during the game; every game a little different; base mostly
@@ -367,13 +367,55 @@ first few rocks, then it speeds up.
 the keen-up through the splits? Are the magnitudes right, too subtle,
 or too much? Does the CPU feel fair?
 
+**Verdict (2026-11-17):** "after two ends, it's hard to tell if the ice
+is changing much. We need ... a better way to show me that and test."
+No verdict on the magnitudes yet, because they could not be seen.
+
+### EXP-10: Making the ice visible and testable (ACTIVE)
+
+**Why it was hard to tell** (Claude's analysis): (1) a stone's
+hog-to-hog time depends on how hard it was thrown as much as on the
+ice, and with a one-shot unmarked throw the player cannot separate
+the two; (2) the model does most of its changing in the first six or
+so stones, so after end 1 of a short game it is nearly flat.
+
+**Build:**
+- **Ice read** after every stone: the hog-to-hog seconds of a draw to
+  the button down the line that stone was thrown on, i.e. what a skip
+  would say that line is running at. It does not depend on the weight
+  thrown. Shown as ICE on the stopwatch (replacing PRV), green once the
+  stone has stopped.
+- **Ice log** screen after each end: a chart of every stone's read
+  (dots, team-coloured) and the centre-line speed (line) against the
+  icemaker's report (dashed), with "STARTED x NOW y" and a one-word
+  trend for the end just played.
+- **Ice lab** (testing aid, LIVING ice only): `I` cycles a truth
+  overlay on the sheet and the skip cam: speed map (red heavier, blue
+  keener), then curl map (orange swings more, purple less), then off.
+  With the lab on, `]` ages the pebble by one stone without throwing,
+  and a box shows the sheet's speed NOW and its BASE.
+- Also (Mike): the **skip cam** now stretches down the sheet, as far
+  as the far hog line, to take in any stone in front of the house, and
+  the broom line is drawn as the true angled line through it.
+
+**Not changed yet:** the model itself. Once the change is visible,
+decide whether the keen-up should be slower so it spans more of a
+short game, and whether patches and the swingy side are strong enough.
+
+**Ask:** play two ends watching the ICE read and the log. Then turn
+the lab on (`I`), age the pebble with `]`, and look at both maps. Is
+the change now readable? Too fast, too slow, too small, too big?
+
 **Verdict:** _pending_
 
 ## Locked-in values
 
 - **Feel (EXP-01):** playback 2.4x, aim arrow 2.0 rad/s over ±4.2°,
   sweep +0.34 per press, -1.1/s decay.
-- **Throw order (EXP-02):** handle, then aim, then weight.
+- **Throw (EXP-02/08):** choose the handle first. Then one motion:
+  pressing Space locks the aim and starts the weight bar, which climbs
+  once (0.575s to the top); letting go throws; topping out throws full
+  weight.
 - **Aiming (EXP-04/05):** broom line only, no curl preview anywhere;
   skip cam while aiming; the delivery line stays on the ice during the
   throw; handles labelled CCW/CW with the curl direction spelled out.
@@ -384,8 +426,9 @@ or too much? Does the CPU feel fair?
 - **Curl model (EXP-04):** zero above 2.1 m/s, full below 1.7; peels
   run exactly straight.
 - **Weight bar (EXP-06/07):** linear in stop position on nominal ice
-  (hog-to-back-line zone is 56% of the bar, draw at 0.555); unmarked;
-  1.15s cycle in TAP mode.
+  (hog-to-back-line zone is 56% of the bar, draw at 0.555); unmarked.
+- **Skip cam (EXP-05/10):** covers the house and stretches to the far
+  hog line to include guards.
 
 ## Raw feedback archive
 
@@ -403,3 +446,9 @@ or too much? Does the CPU feel fair?
   feeling of ice and 'living' ice down then we can turn this into a
   Mike Tyson's punchout style story." Plus the one-pass hold-to-throw
   idea (EXP-08).
+- 2026-11-17: "when i'm trying to hit a guard I can't see it because
+  its covered on the big screen and not show on the zoomed in house
+  view. Maybe a way to zoom the house or pan the zoom box?"
+- 2026-11-17 (EXP-08/09): "Model 3 is perfect. I think after two ends,
+  it's hard to tell if the ice is changing much. We need some way to, a
+  better way to show me that and test."
