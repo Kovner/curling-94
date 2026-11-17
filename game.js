@@ -286,7 +286,7 @@ const VIEW_M = H / SY;
 // ts: time scale | aimSpeed/aimRange: arrow oscillation | powerPeriod: meter cycle
 // curlK: bend strength | sweepAdd/Decay: mash response | sweepFriction/Curl: sweep effect
 const PROFILES = [
-  { name:'CLASSIC', ts:2.4, aimSpeed:2.0, aimRange:4.2, powerPeriod:1.3,
+  { name:'CLASSIC', ts:2.4, aimSpeed:2.0, aimRange:4.2, powerPeriod:1.15,
     curlK:0.0105, sweepAdd:0.34, sweepDecay:1.1, sweepFriction:0.72, sweepCurl:0.30 },
   { name:'ARCADE',  ts:3.4, aimSpeed:3.2, aimRange:4.6, powerPeriod:0.95,
     curlK:0.0085, sweepAdd:0.40, sweepDecay:1.0, sweepFriction:0.65, sweepCurl:0.25 },
@@ -985,24 +985,15 @@ function drawAimArrow() {
 
 function drawPowerMeter() {
   const mx = 10, my = 56, mw = 12, mh = 150;
-  px(mx - 4, my - 10, mw + 32, mh + 22, '#00287c');
+  px(mx - 4, my - 10, mw + 8, mh + 22, '#00287c');
   px(mx - 1, my - 1, mw + 2, mh + 2, '#fcfcfc');
   px(mx, my, mw, mh, '#181818');
-  const yOfV = v => my + mh - powerOfV(v) * mh;
-  // zones: short (dark), guard (yellow), house (green), hits (red)
-  px(mx, yOfV(V_FRONT), mw, Math.max(2, yOfV(V_HOG) - yOfV(V_FRONT)), '#f8b800'); // guard
-  px(mx, yOfV(V_BACK), mw, Math.max(2, yOfV(V_FRONT) - yOfV(V_BACK)), '#00a800'); // house
-  px(mx, my, mw, Math.max(2, yOfV(V_BACK) - my), '#d82800'); // takeout
-  // draw-weight tick
-  px(mx - 2, yOfV(V_DRAW), mw + 4, 1, '#fcfcfc');
-  // fill level
+  // no guidelines on the bar: no zones, no draw tick, no labels. Weight is
+  // learned from the stopwatch split, the way a real thrower learns it.
   const lvl = G.power * mh;
   px(mx + 3, my + mh - lvl, mw - 6, lvl, '#fcfcfc');
   px(mx - 2, my + mh - lvl - 1, mw + 4, 2, '#f87800');
   drawText('PWR', mx + mw / 2, my - 8, '#fcfcfc', 1, 'center');
-  drawText('HIT', mx + mw + 3, yOfV(V_BACK + 0.7) | 0, '#f87858');
-  drawText('DRW', mx + mw + 3, yOfV(V_DRAW) - 2 | 0, '#80d010');
-  drawText('GRD', mx + mw + 3, (yOfV(V_HOG) + yOfV(V_FRONT)) / 2 - 2 | 0, '#f8d878');
 }
 
 function drawSweepGauge() {

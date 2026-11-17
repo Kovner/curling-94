@@ -253,6 +253,21 @@ tick at p=0.555), hit weights compressed into the top 32%, short/hogged
 bottom 12%. Button window now ~45ms (5x). Zones redrawn from the same
 mapping so GRD/house/DRW/HIT are all big and honest.
 
+**Verdict (2026-11-17):** stop-position scaling works, but now "just a
+bit too easy" → EXP-07.
+
+### EXP-07: Unmarked, slightly faster weight meter (ACTIVE)
+
+**Feedback (Mike):** speed the meter up a tiny bit, and remove the
+guidelines so weight has to be judged from the split time — "maybe no
+guidelines at all".
+
+**Build:** CLASSIC meter cycle 1.3s → 1.15s (~12% faster). The bar is
+now plain: no guard/house/hit zones, no draw tick, no labels. The
+stop-position scaling underneath is unchanged, so equal distances of
+ice are still equal slivers of bar — you just can't see where they are.
+The stopwatch split is the only readout of what you threw.
+
 **Verdict:** _pending_
 
 ## Locked-in values

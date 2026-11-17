@@ -36,7 +36,7 @@ Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
 |--------|--------------|----------|
 | HANDLE | Commit to the curl direction first (in-turn / out-turn) | `←` / `→`, then `SPACE` |
 | AIM    | The arrow oscillates left/right | `SPACE` to lock it |
-| WEIGHT | The power meter oscillates — guard / draw / takeout zones marked | `SPACE` to lock |
+| WEIGHT | The power meter oscillates — unmarked, so you learn your weights from the split times | `SPACE` to lock |
 | SWEEP  | Stone is away! Sweeping carries it farther and straighter | mash `SPACE` (or `Z`/`X`) |
 
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or
