@@ -23,7 +23,7 @@ globalThis.requestAnimationFrame = () => {};
 // index.html's own script list, in order, exactly as the browser loads it
 vm.runInThisContext(
   scripts.map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n') +
-  '\n;globalThis.__T = { G, update, draw, seedGame, evalEnd };',
+  '\n;globalThis.__T = { G, update, draw, seedGame, evalEnd, setThrowMode, vOfPower };',
   { filename: 'game-bundle.js' });
 const T = globalThis.__T, G = T.G;
 
@@ -103,4 +103,34 @@ test('scoring counts stones closer than the opponent\'s best', () => {
   assert.deepEqual(T.evalEnd(), { winner: 0, pts: 2 });
   G.stones = [at(1, 3), at(0, 4)];
   assert.deepEqual(T.evalEnd(), { winner: -1, pts: 0 });
+});
+
+test('HOLD throw mode: one pass of the bar, released with the key', () => {
+  const toAim = () => {
+    T.seedGame(3);
+    tapKey('Enter'); step(2); tapKey('Enter'); step(2);     // title -> menu -> first throw
+    tapKey('Space'); step(2); tapKey('Space'); step(2);     // banner -> handle -> aim
+    assert.equal(G.state, 'aim');
+  };
+  const backToTitle = () => { G.state = 'gameover'; G.st = 2; G.gameWinner = 0; tapKey('Enter'); step(2); };
+
+  T.setThrowMode(1);
+  toAim();
+  press('Space'); step(1);
+  assert.equal(G.state, 'power');
+  let last = -1;
+  for (let i = 0; i < 20; i++) { step(1); assert.ok(G.power > last, 'bar only climbs'); last = G.power; }
+  release('Space'); step(1);
+  assert.equal(G.state, 'deliver');
+  assert.ok(G.power > 0.3 && G.power < 0.6, `released at ${G.power}`);
+  assert.equal(G.vRelease, T.vOfPower(G.power));
+  backToTitle();
+
+  toAim();
+  press('Space'); step(120);                                // never let go: tops out and throws
+  assert.notEqual(G.state, 'power');
+  assert.equal(G.power, 1);
+  release('Space');
+  backToTitle();
+  T.setThrowMode(0);
 });

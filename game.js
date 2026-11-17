@@ -278,6 +278,21 @@ const TUNE = {
   sweepDecay: 1.1,    // sweep lost per second
 };
 
+// ---- LAB: variants of the experiment currently under playtest (NOTES.md).
+// EXP-08, how a throw is made. Keys 1-3 switch live; the choice is remembered.
+const THROW_MODES = [
+  { name: 'TAP',       hold: false },             // tap locks aim; bar oscillates; tap sets weight
+  { name: 'HOLD',      hold: true, rise: 0.8 },   // press locks aim and starts the bar, release throws: one pass
+  { name: 'HOLD FAST', hold: true, rise: 0.575 }, // same, at the TAP bar's sweep speed
+];
+let throwModeIdx = 0;
+try { throwModeIdx = Math.min(THROW_MODES.length - 1, Math.max(0, +localStorage.getItem('c94throw') || 0)); } catch (e) {}
+function setThrowMode(i) {
+  throwModeIdx = i;
+  try { localStorage.setItem('c94throw', i); } catch (e) {}
+}
+function throwMode() { return THROW_MODES[throwModeIdx]; }
+
 // All gameplay randomness (CPU decisions, taunts) comes from here, so a
 // game can be replayed from its seed.
 let rand = makeRng((Date.now() ^ (Math.random() * 0x100000000)) >>> 0);
@@ -413,6 +428,13 @@ function cpuSweepLogic() {
 // ---------------------------------------------------------- update
 function update(dt) {
   G.t += dt; G.st += dt;
+  for (let i = 0; i < THROW_MODES.length; i++) {
+    if (tap('Digit' + (i + 1))) {
+      setThrowMode(i);
+      setFlash('THROW: ' + throwMode().name, '#f8d878', 1.0);
+      sfxMove();
+    }
+  }
   if (G.flash) { G.flash.t -= dt; if (G.flash.t <= 0) G.flash = null; }
   // camera easing
   G.cam += (G.camTarget - G.cam) * Math.min(1, dt * 5);
@@ -472,6 +494,13 @@ function update(dt) {
       if (G.cpuTurn) {
         G.power = Math.min(G.cpu.p, G.st / TUNE.powerPeriod);
         if (G.power >= G.cpu.p) { G.vRelease = vOfPower(G.power); sfxLock(); startDelivery(); }
+      } else if (throwMode().hold) {
+        // one pass: the bar climbs while the key that locked the aim stays
+        // down, and the stone goes when it is let go (or the bar tops out)
+        G.power = Math.min(1, G.st / throwMode().rise);
+        if (G.power >= 1 || (!keys['Space'] && !keys['Enter'])) {
+          G.vRelease = vOfPower(G.power); sfxLock(); startDelivery();
+        }
       } else {
         const ph = (G.st / TUNE.powerPeriod) % 1;
         G.power = ph < 0.5 ? ph * 2 : 2 - ph * 2;
@@ -910,6 +939,7 @@ function drawTitle() {
   px(W / 2 - 2, 166, 4, 5, '#881400');
   drawTextSh('HURRY HARD EDITION', W / 2, 206, '#f8d878', '#000000', 1, 'center');
   drawText('(C) 1994 GRANITE GAMES', W / 2, 224, '#9cc4dc', 1, 'center');
+  drawText('THROW LAB: KEYS 1-3', W / 2, 214, '#3cbcfc', 1, 'center');
 }
 function drawMenu() {
   stripes('#881400', '#d82800', 25);
@@ -971,7 +1001,7 @@ function drawGame() {
   drawSweepGauge();
   drawStopwatch();
   if (G.state === 'aim' && !G.cpuTurn)
-    drawText('SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
+    drawText(throwMode().hold ? 'HOLD SPACE: AIM + WEIGHT' : 'SPACE: LOCK AIM', W / 2, 228, '#fcfcfc', 1, 'center');
   if (G.state === 'curl') {
     px(W / 2 - 58, 148, 116, 40, '#00287c');
     px(W / 2 - 58, 148, 116, 1, '#fcfcfc'); px(W / 2 - 58, 187, 116, 1, '#fcfcfc');
@@ -982,7 +1012,8 @@ function drawGame() {
     drawText(G.spin === 1 ? 'CURLS RIGHT' : 'CURLS LEFT', W / 2, 175, '#fcfcfc', 1, 'center');
   }
   if (G.state === 'power' && !G.cpuTurn && Math.floor(G.t * 6) % 2)
-    drawText('SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
+    drawText(throwMode().hold ? 'LET GO TO THROW!' : 'SPACE: SET WEIGHT', W / 2, 228, '#f8d878', 1, 'center');
+  drawLabChip();
   drawFlash();
 }
 function drawStopwatch() {
@@ -999,6 +1030,11 @@ function drawStopwatch() {
   if (hh === null && w.hogT !== null && G.state === 'slide') hh = w.run - w.hogT;
   drawText('H-H ' + fmt(hh), x + 3, y + 13, w.hth === null ? '#9cc4dc' : '#f8d878');
   drawText('SEC', x + 3, y + 22, '#3cbcfc');
+}
+function drawLabChip() {
+  const label = (throwModeIdx + 1) + '.' + throwMode().name;
+  px(0, 226, textW(label, 1) + 6, 12, '#00287c');
+  drawText(label, 3, 229, '#f8d878');
 }
 function drawEndScore() {
   stripes('#00287c', '#0058f8', 20);
