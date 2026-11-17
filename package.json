@@ -1,0 +1,9 @@
+{
+  "name": "curling-94",
+  "private": true,
+  "description": "NES-style arcade curling with realistic stone physics",
+  "scripts": {
+    "test": "node --test test/physics.test.js test/game.test.js",
+    "shots": "node tools/shots.js"
+  }
+}

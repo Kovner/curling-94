@@ -13,7 +13,7 @@ Underneath the pixels the stones obey real curling physics.
 
 | | | |
 |---|---|---|
-| ![title](shots/1-title.png) | ![sweep](shots/7-sweep.png) | ![end score](shots/9-endscore.png) |
+| ![title](shots/1-title.png) | ![aiming with the skip cam](shots/5-aim.png) | ![sweeping](shots/7-sweep.png) |
 
 ## Play it
 
@@ -42,11 +42,6 @@ Each throw is a three-click field-goal routine, then a mash-to-sweep ride:
 `ENTER` starts/advances menus. In the setup menu choose VS CPU or
 2-player hot seat, stones per team per end (2/4/8), and number of ends.
 
-**Feel lab:** keys `1`–`4` hot-swap game-feel tuning profiles (speed,
-meter difficulty, curl, sweeping) any time, even mid-throw. The active
-profile shows bottom-left and is remembered. See `NOTES.md` for the
-ongoing experiments.
-
 The minimap on the right shows the whole sheet, every stone, and your
 **broom line** while you aim — a straight line, like a skip's broom. The
 stone curls off that line (~4 ft on a draw), so call your ice: aim a
@@ -63,25 +58,38 @@ takeouts ~7-9s, just like on real ice.
 - Real sheet dimensions: 4.75 m wide, hog-to-hog 21.95 m, 1.83 m
   (12-foot) house, with hog-line and back-line rules — a thrown stone
   that doesn't fully cross the far hog (and touched nothing) is pulled.
-- Stones decelerate at ~0.092 m/s² (championship-ice friction); draw
-  weight, guard weight and takeout weight all fall out of `v²/2a`.
-- The handle curls the stone only once it slows below ~2 m/s (draws
-  bend ~4 feet, normal hits barely flinch, peels run dead straight) —
-  the curve shape is calibrated against curling.gg's simulator model.
-- Sweeping lowers effective friction (~28%) and kills most of the curl,
-  so you can carry a light draw or hold a line through the curl.
-- Collisions conserve momentum (equal-mass, restitution 0.92): takeouts,
-  raises, and ports all work.
+- Nominal ice decelerates a stone at 0.080 m/s², which makes a draw to
+  the button read 14.0 s hog-to-hog with a 3.77 s split — in line with
+  real timing tables.
+- The handle curls the stone only once it slows below ~2 m/s: draws
+  bend about 4.8 feet, normal hits barely flinch, peels run dead
+  straight. The curve shape is calibrated against curling.gg's model.
+- Sweeping lowers friction by up to 28% and removes most of the curl,
+  so you can carry a light draw or hold a line.
+- Collisions conserve momentum (equal mass, restitution 0.92):
+  takeouts, raises and ports all work.
 - Hammer goes to the team that gives up the end; blank ends keep it.
-- Time runs at 2.4× so a draw takes seconds, not half a minute — the
-  physics underneath is still in real metres and real m/s.
+- Playback runs at 2.4× so a draw takes seconds, not half a minute. The
+  physics underneath is in real metres and seconds, which is why the
+  stopwatch reads real curling times.
 
-## Files
+## Development
+
+No build step and no dependencies; the game is two plain scripts.
 
 - `index.html` — shell page, pixel-scaled canvas
-- `game.js` — the entire game: engine, physics, AI skip, sprites, font,
-  and Web Audio sound (no assets, everything is drawn and synthesized)
-- `test_headless.js` — node smoke test: stubs the DOM, plays a full game
-  vs the CPU, and checks the physics calibration (`node test_headless.js`)
-- `shots.js` — dev script that captures the screenshots in `shots/`
-  using playwright
+- `physics.js` — sheet geometry, the ice model, stone integration,
+  collisions, offline shot simulation and the weight scale. Pure (no
+  DOM), so tests load it directly. Ice is an object with `decelAt(y, z)`
+  and `curlAt(y, z)`; everything asks the ice rather than reading a
+  constant.
+- `game.js` — state machine, input, CPU skip, rendering, sound
+- `test/` — `npm test` runs the physics calibration tests (hog-to-hog
+  and split times, curl, straight peels, collisions, frame-rate
+  independence) and a full seeded game against the CPU
+- `tools/shots.js` — `npm run shots` regenerates `shots/` in headless
+  Chromium (needs playwright)
+- `NOTES.md` — design log: playtest verdicts, locked-in values, backlog
+
+Pushing to the default branch runs the tests and deploys the game files
+to GitHub Pages.
